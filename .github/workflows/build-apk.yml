@@ -1,5 +1,4 @@
 name: Build Zgłoś obrączkę APK v9
-
 on:
   workflow_dispatch:
   push:
@@ -10133,3 +10132,5 @@ EOF_LOGO_ZIEBA
           git add apk/ZglosObraczke-v9-debug.apk README.md .github/workflows/build-apk.yml || true
           git commit -m "Zbuduj APK v8" || echo "Brak zmian do commita"
           git push
+          # start
+# start
