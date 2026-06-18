@@ -40,3 +40,1095 @@ jobs:
                   applicationId 'pl.bartoszlawicki.polringreporter'
                   minSdk 23
                   targetSdk 35
+                  versionCode 2
+                  versionName '0.2.0-pretty-rodo'
+              }
+          
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+          }
+          
+          dependencies {
+              implementation 'androidx.core:core:1.13.1'
+          }
+          EOF_APP_BUILD
+          cat > app/src/main/res/values/strings.xml <<'EOF_STRINGS'
+          <resources>
+              <string name="app_name">POLRING Reporter</string>
+          </resources>
+          EOF_STRINGS
+          cat > app/src/main/res/values/styles.xml <<'EOF_STYLES'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:windowLightStatusBar">true</item>
+                  <item name="android:statusBarColor">#FAFCF7</item>
+                  <item name="android:navigationBarColor">#FAFCF7</item>
+                  <item name="android:colorAccent">#2E7D32</item>
+              </style>
+          </resources>
+          EOF_STYLES
+          cat > app/src/main/res/xml/file_paths.xml <<'EOF_FILE_PATHS'
+          <?xml version="1.0" encoding="utf-8"?>
+          <paths xmlns:android="http://schemas.android.com/apk/res/android">
+              <external-files-path name="images" path="Pictures" />
+              <cache-path name="cache" path="." />
+          </paths>
+          EOF_FILE_PATHS
+          cat > app/src/main/AndroidManifest.xml <<'EOF_MANIFEST'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+          
+              <uses-feature android:name="android.hardware.camera" android:required="false" />
+          
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.CAMERA" />
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+          
+              <application
+                  android:allowBackup="true"
+                  android:label="@string/app_name"
+                  android:theme="@style/AppTheme"
+                  android:usesCleartextTraffic="false">
+          
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+          
+                  <provider
+                      android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true">
+                      <meta-data
+                          android:name="android.support.FILE_PROVIDER_PATHS"
+                          android:resource="@xml/file_paths" />
+                  </provider>
+          
+              </application>
+          </manifest>
+          EOF_MANIFEST
+          cat > app/src/main/java/pl/bartoszlawicki/polringreporter/MainActivity.java <<'EOF_MAIN_JAVA'
+          package pl.bartoszlawicki.polringreporter;
+          
+          import android.Manifest;
+          import android.app.Activity;
+          import android.content.ActivityNotFoundException;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.content.SharedPreferences;
+          import android.content.pm.PackageManager;
+          import android.graphics.Color;
+          import android.graphics.Typeface;
+          import android.graphics.drawable.GradientDrawable;
+          import android.location.Location;
+          import android.location.LocationManager;
+          import android.net.Uri;
+          import android.os.Build;
+          import android.os.Bundle;
+          import android.os.Environment;
+          import android.provider.MediaStore;
+          import android.text.InputType;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.ViewGroup;
+          import android.view.Window;
+          import android.widget.Button;
+          import android.widget.CheckBox;
+          import android.widget.EditText;
+          import android.widget.HorizontalScrollView;
+          import android.widget.ImageButton;
+          import android.widget.LinearLayout;
+          import android.widget.ScrollView;
+          import android.widget.TextView;
+          import android.widget.Toast;
+          
+          import androidx.core.content.FileProvider;
+          
+          import org.json.JSONArray;
+          import org.json.JSONObject;
+          
+          import java.io.File;
+          import java.io.IOException;
+          import java.text.SimpleDateFormat;
+          import java.util.ArrayList;
+          import java.util.Date;
+          import java.util.Locale;
+          
+          public class MainActivity extends Activity {
+              private static final int REQ_CAMERA = 10;
+              private static final int REQ_GALLERY = 11;
+              private static final int REQ_LOCATION = 12;
+              private static final String PREFS = "polring_reporter_prefs_v2";
+              private static final String PREF_DRAFT = "draft";
+              private static final String POLRING_EMAIL = "ring@miiz.waw.pl";
+              private static final String POLRING_FORM = "https://ring.stornit.gda.pl/Stw.aspx";
+          
+              private final int GREEN = Color.rgb(46, 125, 50);
+              private final int GREEN_DARK = Color.rgb(27, 94, 32);
+              private final int GREEN_LIGHT = Color.rgb(232, 245, 233);
+              private final int BLUE = Color.rgb(21, 101, 192);
+              private final int BLUE_LIGHT = Color.rgb(232, 240, 254);
+              private final int BG = Color.rgb(250, 252, 247);
+              private final int TEXT = Color.rgb(25, 32, 37);
+              private final int MUTED = Color.rgb(91, 103, 112);
+              private final int BORDER = Color.rgb(218, 226, 214);
+          
+              private int step = 0;
+              private Uri currentPhotoUri;
+              private final ArrayList<Uri> photoUris = new ArrayList<>();
+          
+              private EditText ringNumber;
+              private EditText ringText;
+              private EditText markerType;
+              private EditText species;
+              private EditText birdState;
+              private EditText birdFate;
+              private EditText place;
+              private EditText coordinates;
+              private EditText date;
+              private EditText time;
+              private EditText description;
+              private EditText reporterName;
+              private EditText reporterEmail;
+              private EditText reporterPhone;
+              private CheckBox rodoScientific;
+              private CheckBox rodoPolring;
+              private CheckBox rodoContact;
+          
+              private String ringNumberValue = "";
+              private String ringTextValue = "";
+              private String markerTypeValue = "Obrączka metalowa";
+              private String speciesValue = "";
+              private String birdStateValue = "Żywy – zdrowy";
+              private String birdFateValue = "Zaobserwowany";
+              private String placeValue = "";
+              private String coordinatesValue = "";
+              private String dateValue = "";
+              private String timeValue = "";
+              private String descriptionValue = "";
+              private String reporterNameValue = "";
+              private String reporterEmailValue = "";
+              private String reporterPhoneValue = "";
+              private boolean rodoScientificValue = false;
+              private boolean rodoPolringValue = false;
+              private boolean rodoContactValue = false;
+          
+              @Override
+              protected void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  Window window = getWindow();
+                  window.setStatusBarColor(BG);
+                  window.setNavigationBarColor(BG);
+                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                      window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+                  }
+                  setDefaultDateTimeValues();
+                  loadDraftToModel();
+                  render();
+              }
+          
+              private void render() {
+                  ScrollView scroll = new ScrollView(this);
+                  scroll.setFillViewport(true);
+                  scroll.setBackgroundColor(BG);
+          
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(dp(14), dp(16), dp(14), dp(18));
+                  scroll.addView(root, new ScrollView.LayoutParams(
+                          ViewGroup.LayoutParams.MATCH_PARENT,
+                          ViewGroup.LayoutParams.WRAP_CONTENT
+                  ));
+          
+                  addHeader(root);
+                  addStepper(root);
+          
+                  if (step == 0) addDataScreen(root);
+                  if (step == 1) addLocationScreen(root);
+                  if (step == 2) addSummaryScreen(root);
+          
+                  setContentView(scroll);
+              }
+          
+              private void addHeader(LinearLayout root) {
+                  LinearLayout header = new LinearLayout(this);
+                  header.setOrientation(LinearLayout.HORIZONTAL);
+                  header.setGravity(Gravity.CENTER_VERTICAL);
+                  header.setPadding(dp(6), dp(4), dp(6), dp(14));
+                  root.addView(header, matchWrap());
+          
+                  TextView logo = new TextView(this);
+                  logo.setText("🐦");
+                  logo.setTextSize(30);
+                  logo.setGravity(Gravity.CENTER);
+                  logo.setBackground(round(GREEN_LIGHT, GREEN, dp(28), dp(1)));
+                  LinearLayout.LayoutParams logoLp = new LinearLayout.LayoutParams(dp(58), dp(58));
+                  header.addView(logo, logoLp);
+          
+                  LinearLayout titleBox = new LinearLayout(this);
+                  titleBox.setOrientation(LinearLayout.VERTICAL);
+                  titleBox.setPadding(dp(12), 0, 0, 0);
+                  header.addView(titleBox, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+          
+                  TextView title = new TextView(this);
+                  title.setText("POLRING Reporter");
+                  title.setTextSize(24);
+                  title.setTextColor(GREEN_DARK);
+                  title.setTypeface(Typeface.DEFAULT_BOLD);
+                  titleBox.addView(title);
+          
+                  TextView subtitle = new TextView(this);
+                  subtitle.setText("Zgłoszenie ptaka z obrączką");
+                  subtitle.setTextSize(15);
+                  subtitle.setTextColor(MUTED);
+                  subtitle.setPadding(0, dp(2), 0, 0);
+                  titleBox.addView(subtitle);
+          
+                  TextView menu = new TextView(this);
+                  menu.setText("⋮");
+                  menu.setTextSize(28);
+                  menu.setGravity(Gravity.CENTER);
+                  menu.setTextColor(TEXT);
+                  header.addView(menu, new LinearLayout.LayoutParams(dp(36), dp(46)));
+              }
+          
+              private void addStepper(LinearLayout root) {
+                  LinearLayout wrap = new LinearLayout(this);
+                  wrap.setOrientation(LinearLayout.VERTICAL);
+                  wrap.setPadding(0, 0, 0, dp(12));
+                  root.addView(wrap, matchWrap());
+          
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER);
+                  wrap.addView(row, matchWrap());
+          
+                  String[] labels = {"Dane", "Lokalizacja", "Zdjęcia", "Wysyłka"};
+                  for (int i = 0; i < labels.length; i++) {
+                      LinearLayout item = new LinearLayout(this);
+                      item.setOrientation(LinearLayout.VERTICAL);
+                      item.setGravity(Gravity.CENTER);
+                      row.addView(item, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+          
+                      TextView dot = new TextView(this);
+                      boolean done = i < step || (step == 2 && i < 3);
+                      boolean active = (step == 0 && i == 0) || (step == 1 && (i == 1 || i == 2)) || (step == 2 && i == 3);
+                      dot.setText(done ? "✓" : String.valueOf(i + 1));
+                      dot.setTextSize(14);
+                      dot.setTypeface(Typeface.DEFAULT_BOLD);
+                      dot.setTextColor(Color.WHITE);
+                      dot.setGravity(Gravity.CENTER);
+                      dot.setBackground(round(done ? GREEN : active ? BLUE : Color.rgb(170, 174, 166), 999));
+                      item.addView(dot, new LinearLayout.LayoutParams(dp(30), dp(30)));
+          
+                      TextView label = new TextView(this);
+                      label.setText(labels[i]);
+                      label.setTextSize(12);
+                      label.setTextColor(active || done ? TEXT : MUTED);
+                      label.setGravity(Gravity.CENTER);
+                      label.setPadding(0, dp(5), 0, 0);
+                      item.addView(label);
+                  }
+              }
+          
+              private void addDataScreen(LinearLayout root) {
+                  LinearLayout card = card(root, "Dane obrączki i ptaka", "Uzupełnij to, co udało się odczytać. Jedno zgłoszenie dotyczy jednego ptaka.");
+                  ringNumber = addFieldRow(card, "🔗", "Numer obrączki", "Wpisz pełny numer lub kod", ringNumberValue, false, false);
+                  ringText = addFieldRow(card, "ABC", "Napis na obrączce", "Dokładny tekst widoczny na obrączce", ringTextValue, false, false);
+                  markerType = addFieldRow(card, "🏷", "Typ znacznika", "Np. obrączka metalowa, kolorowa, obroża", markerTypeValue, false, false);
+                  species = addFieldRow(card, "🐦", "Gatunek ptaka", "Jeśli nie wiesz — wpisz „nieznany”", speciesValue, false, false);
+                  birdState = addFieldRow(card, "❤", "Stan ptaka", "Np. żywy, ranny, martwy", birdStateValue, false, false);
+                  birdFate = addFieldRow(card, "🍃", "Los ptaka", "Np. zaobserwowany, wypuszczony, azyl", birdFateValue, false, false);
+          
+                  LinearLayout nav = navRow(root);
+                  Button save = outlineButton("Zapisz szkic");
+                  save.setOnClickListener(v -> { updateModelFromFields(); saveDraft(); });
+                  nav.addView(save, new LinearLayout.LayoutParams(0, dp(52), 1));
+                  Button next = filledButton("Dalej  →");
+                  next.setOnClickListener(v -> { updateModelFromFields(); step = 1; render(); });
+                  nav.addView(next, new LinearLayout.LayoutParams(0, dp(52), 1));
+              }
+          
+              private void addLocationScreen(LinearLayout root) {
+                  LinearLayout locCard = card(root, "Lokalizacja", "Pobierz GPS, wpisz ręcznie albo otwórz mapę i przepisz punkt.");
+          
+                  TextView map = new TextView(this);
+                  map.setText("🗺\n\nMapa lokalizacji\n" + (coordinatesValue.isEmpty() ? "brak współrzędnych" : coordinatesValue));
+                  map.setTextSize(18);
+                  map.setTextColor(BLUE);
+                  map.setGravity(Gravity.CENTER);
+                  map.setBackground(round(Color.rgb(235, 245, 236), Color.rgb(200, 222, 204), dp(16), dp(1)));
+                  locCard.addView(map, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(170)));
+          
+                  LinearLayout buttons = new LinearLayout(this);
+                  buttons.setOrientation(LinearLayout.HORIZONTAL);
+                  buttons.setPadding(0, dp(12), 0, dp(6));
+                  locCard.addView(buttons, matchWrap());
+          
+                  Button gps = outlineButton("◎ Pobierz GPS");
+                  gps.setOnClickListener(v -> useGps());
+                  buttons.addView(gps, new LinearLayout.LayoutParams(0, dp(52), 1));
+          
+                  SpaceSmall(buttons);
+          
+                  Button mapBtn = blueOutlineButton("▣ Wskaż na mapie");
+                  mapBtn.setOnClickListener(v -> openMap());
+                  buttons.addView(mapBtn, new LinearLayout.LayoutParams(0, dp(52), 1));
+          
+                  place = addFieldRow(locCard, "📍", "Miejsce", "Miejscowość, adres lub opis miejsca", placeValue, true, false);
+                  coordinates = addFieldRow(locCard, "◎", "Współrzędne GPS", "Np. 54.352000, 18.646600", coordinatesValue, false, false);
+                  date = addFieldRow(locCard, "📅", "Data", "Data obserwacji / znalezienia", dateValue, false, false);
+                  time = addFieldRow(locCard, "🕘", "Godzina", "Przybliżona godzina", timeValue, false, false);
+          
+                  LinearLayout photoCard = card(root, "Zdjęcia", "Dodaj zdjęcie obrączki i/lub ptaka. POLRING zaleca zdjęcia do potwierdzenia odczytu.");
+                  LinearLayout photoTiles = new LinearLayout(this);
+                  photoTiles.setOrientation(LinearLayout.HORIZONTAL);
+                  photoCard.addView(photoTiles, matchWrap());
+                  photoTiles.addView(photoTile("Obrączka", photoUris.size() > 0 ? "✓ dodano" : "brak"), new LinearLayout.LayoutParams(0, dp(118), 1));
+                  SpaceSmall(photoTiles);
+                  photoTiles.addView(photoTile("Ptak", photoUris.size() > 1 ? "✓ dodano" : "opcjonalnie"), new LinearLayout.LayoutParams(0, dp(118), 1));
+          
+                  LinearLayout photoButtons = new LinearLayout(this);
+                  photoButtons.setOrientation(LinearLayout.HORIZONTAL);
+                  photoButtons.setPadding(0, dp(12), 0, dp(4));
+                  photoCard.addView(photoButtons, matchWrap());
+                  Button camera = outlineButton("📷 Zrób zdjęcie");
+                  camera.setOnClickListener(v -> takePhoto());
+                  photoButtons.addView(camera, new LinearLayout.LayoutParams(0, dp(52), 1));
+                  SpaceSmall(photoButtons);
+                  Button gallery = blueOutlineButton("▣ Dodaj z galerii");
+                  gallery.setOnClickListener(v -> pickFromGallery());
+                  photoButtons.addView(gallery, new LinearLayout.LayoutParams(0, dp(52), 1));
+          
+                  TextView count = helper("Zdjęcia dodane: " + photoUris.size());
+                  count.setPadding(dp(4), dp(8), 0, 0);
+                  photoCard.addView(count);
+          
+                  LinearLayout nav = navRow(root);
+                  Button back = outlineButton("← Wróć");
+                  back.setOnClickListener(v -> { updateModelFromFields(); step = 0; render(); });
+                  nav.addView(back, new LinearLayout.LayoutParams(0, dp(52), 1));
+                  Button next = filledButton("Podsumowanie  →");
+                  next.setOnClickListener(v -> { updateModelFromFields(); step = 2; render(); });
+                  nav.addView(next, new LinearLayout.LayoutParams(0, dp(52), 1));
+              }
+          
+              private void addSummaryScreen(LinearLayout root) {
+                  TextView pill = new TextView(this);
+                  pill.setText("✓ Gotowe do sprawdzenia");
+                  pill.setTextSize(15);
+                  pill.setTextColor(GREEN_DARK);
+                  pill.setGravity(Gravity.CENTER);
+                  pill.setTypeface(Typeface.DEFAULT_BOLD);
+                  pill.setBackground(round(GREEN_LIGHT, Color.rgb(175, 210, 173), dp(999), dp(1)));
+                  LinearLayout.LayoutParams pillLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(46));
+                  pillLp.setMargins(dp(28), dp(4), dp(28), dp(12));
+                  root.addView(pill, pillLp);
+          
+                  LinearLayout summary = card(root, "Podsumowanie zgłoszenia", "Sprawdź dane przed wysłaniem.");
+                  addSummaryRow(summary, "🔗", "Numer obrączki", ringNumberValue);
+                  addSummaryRow(summary, "ABC", "Napis na obrączce", ringTextValue);
+                  addSummaryRow(summary, "🏷", "Typ znacznika", markerTypeValue);
+                  addSummaryRow(summary, "🐦", "Gatunek ptaka", speciesValue);
+                  addSummaryRow(summary, "❤", "Stan ptaka", birdStateValue);
+                  addSummaryRow(summary, "🍃", "Los ptaka", birdFateValue);
+                  addSummaryRow(summary, "📍", "Miejsce", placeValue);
+                  addSummaryRow(summary, "◎", "GPS", coordinatesValue);
+                  addSummaryRow(summary, "📅", "Data", dateValue);
+                  addSummaryRow(summary, "🕘", "Godzina", timeValue);
+                  addSummaryRow(summary, "📷", "Zdjęcia", String.valueOf(photoUris.size()));
+          
+                  LinearLayout contact = card(root, "Dane zgłaszającego", "Te dane trafią do treści zgłoszenia, żeby POLRING mógł odpisać lub dopytać.");
+                  reporterName = addFieldRow(contact, "👤", "Imię i nazwisko", "Dane osoby zgłaszającej", reporterNameValue, false, false);
+                  reporterEmail = addFieldRow(contact, "✉", "E-mail", "Adres do odpowiedzi", reporterEmailValue, false, true);
+                  reporterPhone = addFieldRow(contact, "☎", "Telefon", "Opcjonalnie", reporterPhoneValue, false, false);
+                  reporterPhone.setInputType(InputType.TYPE_CLASS_PHONE);
+          
+                  LinearLayout rodo = card(root, "RODO i zgody", "Wymagane przed wysłaniem. Tekst dodany na podstawie informacji widocznych przy formularzu POLRING i rejestracji konta.");
+                  rodoScientific = addCheckbox(rodo, "Wyrażam zgodę na przetwarzanie moich danych osobowych w celach naukowych związanych ze zgłoszeniem ptaka z obrączką.", rodoScientificValue);
+                  rodoPolring = addCheckbox(rodo, "Akceptuję, że dane zostaną przekazane do systemu POLRING / Krajowej Centrali Obrączkowania i będą obsługiwane przez stronę oraz oprogramowanie POLRING.", rodoPolringValue);
+                  rodoContact = addCheckbox(rodo, "Potwierdzam, że podaję dane dobrowolnie i zgadzam się na kontakt w celu weryfikacji albo uzupełnienia zgłoszenia.", rodoContactValue);
+          
+                  description = addFieldRow(rodo, "📝", "Opis / uwagi", "Dodatkowe informacje, np. przyczyna śmierci lub okoliczności", descriptionValue, true, false);
+          
+                  Button polring = filledButton("✈  Wyślij do POLRING / otwórz formularz");
+                  polring.setOnClickListener(v -> openPolringForm());
+                  root.addView(polring, fullButtonLp());
+          
+                  Button gmail = gmailButton("M  Wyślij przez Gmail");
+                  gmail.setOnClickListener(v -> sendViaGmail());
+                  root.addView(gmail, fullButtonLp());
+          
+                  Button save = outlineButton("▣  Zapisz szkic");
+                  save.setOnClickListener(v -> { updateModelFromFields(); saveDraft(); });
+                  root.addView(save, fullButtonLp());
+          
+                  LinearLayout nav = navRow(root);
+                  Button back = outlineButton("← Wróć do lokalizacji");
+                  back.setOnClickListener(v -> { updateModelFromFields(); step = 1; render(); });
+                  nav.addView(back, new LinearLayout.LayoutParams(0, dp(52), 1));
+                  Button clear = dangerOutlineButton("Wyczyść");
+                  clear.setOnClickListener(v -> clearForm());
+                  nav.addView(clear, new LinearLayout.LayoutParams(0, dp(52), 1));
+          
+                  TextView lock = helper("🔒 Twoje dane są zapisane lokalnie w telefonie. Przy wysyłce przez Gmail widzisz treść maila przed kliknięciem Wyślij.");
+                  lock.setPadding(dp(6), dp(8), dp(6), dp(10));
+                  root.addView(lock);
+              }
+          
+              private LinearLayout card(LinearLayout root, String title, String subtitle) {
+                  LinearLayout c = new LinearLayout(this);
+                  c.setOrientation(LinearLayout.VERTICAL);
+                  c.setPadding(dp(14), dp(14), dp(14), dp(14));
+                  c.setBackground(round(Color.WHITE, BORDER, dp(18), dp(1)));
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                  lp.setMargins(0, dp(8), 0, dp(12));
+                  root.addView(c, lp);
+          
+                  TextView t = new TextView(this);
+                  t.setText(title);
+                  t.setTextSize(18);
+                  t.setTextColor(TEXT);
+                  t.setTypeface(Typeface.DEFAULT_BOLD);
+                  c.addView(t);
+          
+                  if (subtitle != null && !subtitle.isEmpty()) {
+                      TextView s = helper(subtitle);
+                      s.setPadding(0, dp(4), 0, dp(8));
+                      c.addView(s);
+                  }
+                  return c;
+              }
+          
+              private EditText addFieldRow(LinearLayout parent, String icon, String label, String hint, String value, boolean multiline, boolean email) {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.TOP);
+                  row.setPadding(0, dp(10), 0, dp(10));
+                  parent.addView(row, matchWrap());
+          
+                  TextView ic = new TextView(this);
+                  ic.setText(icon);
+                  ic.setTextSize(icon.length() <= 2 ? 18 : 12);
+                  ic.setGravity(Gravity.CENTER);
+                  ic.setTextColor(GREEN_DARK);
+                  ic.setTypeface(Typeface.DEFAULT_BOLD);
+                  ic.setBackground(round(GREEN_LIGHT, 999));
+                  LinearLayout.LayoutParams icLp = new LinearLayout.LayoutParams(dp(46), dp(46));
+                  row.addView(ic, icLp);
+          
+                  LinearLayout box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setPadding(dp(12), 0, 0, 0);
+                  row.addView(box, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+          
+                  TextView lab = new TextView(this);
+                  lab.setText(label);
+                  lab.setTextSize(16);
+                  lab.setTextColor(TEXT);
+                  lab.setTypeface(Typeface.DEFAULT_BOLD);
+                  box.addView(lab);
+          
+                  TextView help = helper(hint);
+                  help.setPadding(0, dp(2), 0, dp(6));
+                  box.addView(help);
+          
+                  EditText edit = new EditText(this);
+                  edit.setText(value == null ? "" : value);
+                  edit.setTextSize(15);
+                  edit.setSingleLine(!multiline);
+                  edit.setHint(hint);
+                  edit.setPadding(dp(12), 0, dp(12), 0);
+                  edit.setTextColor(TEXT);
+                  edit.setHintTextColor(Color.rgb(145, 153, 145));
+                  edit.setBackground(round(Color.WHITE, Color.rgb(215, 221, 215), dp(10), dp(1)));
+                  if (multiline) {
+                      edit.setMinLines(2);
+                      edit.setGravity(Gravity.TOP | Gravity.START);
+                      edit.setPadding(dp(12), dp(10), dp(12), dp(10));
+                  }
+                  if (email) edit.setInputType(InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+                  box.addView(edit, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, multiline ? dp(92) : dp(48)));
+                  return edit;
+              }
+          
+              private CheckBox addCheckbox(LinearLayout parent, String text, boolean checked) {
+                  CheckBox cb = new CheckBox(this);
+                  cb.setText(text);
+                  cb.setTextSize(14);
+                  cb.setTextColor(TEXT);
+                  cb.setPadding(0, dp(4), 0, dp(4));
+                  cb.setChecked(checked);
+                  parent.addView(cb, matchWrap());
+                  return cb;
+              }
+          
+              private View photoTile(String title, String status) {
+                  LinearLayout tile = new LinearLayout(this);
+                  tile.setOrientation(LinearLayout.VERTICAL);
+                  tile.setGravity(Gravity.CENTER);
+                  tile.setPadding(dp(8), dp(8), dp(8), dp(8));
+                  tile.setBackground(round(Color.rgb(245, 250, 245), Color.rgb(202, 224, 204), dp(14), dp(1)));
+          
+                  TextView icon = new TextView(this);
+                  icon.setText(title.equals("Obrączka") ? "🔗" : "🐦");
+                  icon.setTextSize(34);
+                  icon.setGravity(Gravity.CENTER);
+                  tile.addView(icon);
+          
+                  TextView titleTv = new TextView(this);
+                  titleTv.setText(title);
+                  titleTv.setTextColor(TEXT);
+                  titleTv.setTextSize(15);
+                  titleTv.setTypeface(Typeface.DEFAULT_BOLD);
+                  titleTv.setGravity(Gravity.CENTER);
+                  tile.addView(titleTv);
+          
+                  TextView st = helper(status);
+                  st.setGravity(Gravity.CENTER);
+                  tile.addView(st);
+                  return tile;
+              }
+          
+              private void addSummaryRow(LinearLayout parent, String icon, String label, String value) {
+                  LinearLayout row = new LinearLayout(this);
+                  row.setOrientation(LinearLayout.HORIZONTAL);
+                  row.setGravity(Gravity.CENTER_VERTICAL);
+                  row.setPadding(0, dp(7), 0, dp(7));
+                  parent.addView(row, matchWrap());
+          
+                  TextView ic = new TextView(this);
+                  ic.setText(icon);
+                  ic.setTextSize(icon.length() <= 2 ? 17 : 11);
+                  ic.setGravity(Gravity.CENTER);
+                  ic.setTextColor(GREEN_DARK);
+                  row.addView(ic, new LinearLayout.LayoutParams(dp(32), dp(32)));
+          
+                  TextView lab = new TextView(this);
+                  lab.setText(label);
+                  lab.setTextSize(14);
+                  lab.setTextColor(TEXT);
+                  row.addView(lab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+          
+                  TextView val = new TextView(this);
+                  val.setText((value == null || value.trim().isEmpty()) ? "—" : value.trim());
+                  val.setTextSize(14);
+                  val.setTextColor(TEXT);
+                  val.setGravity(Gravity.END);
+                  val.setTypeface(Typeface.DEFAULT_BOLD);
+                  row.addView(val, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+              }
+          
+              private LinearLayout navRow(LinearLayout root) {
+                  LinearLayout nav = new LinearLayout(this);
+                  nav.setOrientation(LinearLayout.HORIZONTAL);
+                  nav.setPadding(0, dp(4), 0, dp(4));
+                  root.addView(nav, matchWrap());
+                  return nav;
+              }
+          
+              private Button filledButton(String text) {
+                  Button b = baseButton(text);
+                  b.setTextColor(Color.WHITE);
+                  b.setBackground(round(GREEN, dp(999)));
+                  return b;
+              }
+          
+              private Button outlineButton(String text) {
+                  Button b = baseButton(text);
+                  b.setTextColor(GREEN_DARK);
+                  b.setBackground(round(Color.WHITE, GREEN, dp(999), dp(1)));
+                  return b;
+              }
+          
+              private Button blueOutlineButton(String text) {
+                  Button b = baseButton(text);
+                  b.setTextColor(BLUE);
+                  b.setBackground(round(Color.WHITE, BLUE, dp(999), dp(1)));
+                  return b;
+              }
+          
+              private Button dangerOutlineButton(String text) {
+                  Button b = baseButton(text);
+                  b.setTextColor(Color.rgb(170, 40, 40));
+                  b.setBackground(round(Color.WHITE, Color.rgb(190, 80, 80), dp(999), dp(1)));
+                  return b;
+              }
+          
+              private Button gmailButton(String text) {
+                  Button b = baseButton(text);
+                  b.setTextColor(TEXT);
+                  b.setBackground(round(Color.WHITE, Color.rgb(140, 145, 150), dp(999), dp(1)));
+                  return b;
+              }
+          
+              private Button baseButton(String text) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setTextSize(15);
+                  b.setAllCaps(false);
+                  b.setTypeface(Typeface.DEFAULT_BOLD);
+                  b.setGravity(Gravity.CENTER);
+                  return b;
+              }
+          
+              private TextView helper(String text) {
+                  TextView tv = new TextView(this);
+                  tv.setText(text == null ? "" : text);
+                  tv.setTextSize(13);
+                  tv.setTextColor(MUTED);
+                  return tv;
+              }
+          
+              private LinearLayout.LayoutParams matchWrap() {
+                  return new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+              }
+          
+              private LinearLayout.LayoutParams fullButtonLp() {
+                  LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54));
+                  lp.setMargins(0, dp(6), 0, dp(6));
+                  return lp;
+              }
+          
+              private void SpaceSmall(LinearLayout row) {
+                  View spacer = new View(this);
+                  row.addView(spacer, new LinearLayout.LayoutParams(dp(10), 1));
+              }
+          
+              private GradientDrawable round(int color, int radius) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(radius);
+                  return g;
+              }
+          
+              private GradientDrawable round(int color, int strokeColor, int radius, int strokeWidth) {
+                  GradientDrawable g = new GradientDrawable();
+                  g.setColor(color);
+                  g.setCornerRadius(radius);
+                  g.setStroke(strokeWidth, strokeColor);
+                  return g;
+              }
+          
+              private int dp(int value) {
+                  return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+              }
+          
+              private void updateModelFromFields() {
+                  if (ringNumber != null) ringNumberValue = text(ringNumber);
+                  if (ringText != null) ringTextValue = text(ringText);
+                  if (markerType != null) markerTypeValue = text(markerType);
+                  if (species != null) speciesValue = text(species);
+                  if (birdState != null) birdStateValue = text(birdState);
+                  if (birdFate != null) birdFateValue = text(birdFate);
+                  if (place != null) placeValue = text(place);
+                  if (coordinates != null) coordinatesValue = text(coordinates);
+                  if (date != null) dateValue = text(date);
+                  if (time != null) timeValue = text(time);
+                  if (description != null) descriptionValue = text(description);
+                  if (reporterName != null) reporterNameValue = text(reporterName);
+                  if (reporterEmail != null) reporterEmailValue = text(reporterEmail);
+                  if (reporterPhone != null) reporterPhoneValue = text(reporterPhone);
+                  if (rodoScientific != null) rodoScientificValue = rodoScientific.isChecked();
+                  if (rodoPolring != null) rodoPolringValue = rodoPolring.isChecked();
+                  if (rodoContact != null) rodoContactValue = rodoContact.isChecked();
+              }
+          
+              private void setDefaultDateTimeValues() {
+                  if (dateValue == null || dateValue.isEmpty()) {
+                      dateValue = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
+                  }
+                  if (timeValue == null || timeValue.isEmpty()) {
+                      timeValue = new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date());
+                  }
+              }
+          
+              private void useGps() {
+                  updateModelFromFields();
+                  if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+                          checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, REQ_LOCATION);
+                      return;
+                  }
+                  fillLastKnownLocation();
+              }
+          
+              private void fillLastKnownLocation() {
+                  try {
+                      LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+                      Location best = null;
+                      if (lm != null) {
+                          Location gps = lm.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                          Location net = lm.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+                          if (gps != null) best = gps;
+                          if (net != null && (best == null || net.getTime() > best.getTime())) best = net;
+                      }
+                      if (best != null) {
+                          coordinatesValue = String.format(Locale.US, "%.6f, %.6f", best.getLatitude(), best.getLongitude());
+                          Toast.makeText(this, "Pobrano lokalizację GPS", Toast.LENGTH_SHORT).show();
+                          render();
+                      } else {
+                          Toast.makeText(this, "Nie mam jeszcze lokalizacji. Włącz GPS i spróbuj ponownie.", Toast.LENGTH_LONG).show();
+                      }
+                  } catch (SecurityException ex) {
+                      Toast.makeText(this, "Brak uprawnień lokalizacji", Toast.LENGTH_LONG).show();
+                  }
+              }
+          
+              private void openMap() {
+                  updateModelFromFields();
+                  Uri uri;
+                  if (!coordinatesValue.isEmpty()) uri = Uri.parse("geo:" + coordinatesValue.replace(" ", "") + "?q=" + coordinatesValue.replace(" ", ""));
+                  else uri = Uri.parse("geo:0,0?q=ptaki");
+                  Intent i = new Intent(Intent.ACTION_VIEW, uri);
+                  try {
+                      startActivity(i);
+                  } catch (ActivityNotFoundException e) {
+                      Toast.makeText(this, "Brak aplikacji map", Toast.LENGTH_LONG).show();
+                  }
+              }
+          
+              private void openPolringForm() {
+                  updateModelFromFields();
+                  if (!validateBeforeSend(false)) return;
+                  saveDraft();
+                  Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(POLRING_FORM));
+                  try {
+                      startActivity(i);
+                  } catch (ActivityNotFoundException e) {
+                      Toast.makeText(this, "Nie udało się otworzyć formularza POLRING", Toast.LENGTH_LONG).show();
+                  }
+              }
+          
+              private void takePhoto() {
+                  updateModelFromFields();
+                  if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                      requestPermissions(new String[]{Manifest.permission.CAMERA}, REQ_CAMERA);
+                      return;
+                  }
+                  Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                  if (intent.resolveActivity(getPackageManager()) == null) {
+                      Toast.makeText(this, "Brak aplikacji aparatu", Toast.LENGTH_LONG).show();
+                      return;
+                  }
+                  try {
+                      File photoFile = createImageFile();
+                      currentPhotoUri = FileProvider.getUriForFile(this, getPackageName() + ".fileprovider", photoFile);
+                      intent.putExtra(MediaStore.EXTRA_OUTPUT, currentPhotoUri);
+                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                      startActivityForResult(intent, REQ_CAMERA);
+                  } catch (IOException e) {
+                      Toast.makeText(this, "Nie udało się utworzyć pliku zdjęcia", Toast.LENGTH_LONG).show();
+                  }
+              }
+          
+              private File createImageFile() throws IOException {
+                  String stamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
+                  File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
+                  return File.createTempFile("POLRING_" + stamp + "_", ".jpg", storageDir);
+              }
+          
+              private void pickFromGallery() {
+                  updateModelFromFields();
+                  Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                  intent.addCategory(Intent.CATEGORY_OPENABLE);
+                  intent.setType("image/*");
+                  intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                  startActivityForResult(intent, REQ_GALLERY);
+              }
+          
+              @Override
+              protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+                  super.onActivityResult(requestCode, resultCode, data);
+                  if (resultCode != RESULT_OK) return;
+                  if (requestCode == REQ_CAMERA && currentPhotoUri != null) {
+                      photoUris.add(currentPhotoUri);
+                      currentPhotoUri = null;
+                      Toast.makeText(this, "Dodano zdjęcie", Toast.LENGTH_SHORT).show();
+                      saveDraft();
+                      render();
+                  } else if (requestCode == REQ_GALLERY && data != null && data.getData() != null) {
+                      Uri uri = data.getData();
+                      try {
+                          getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                      } catch (Exception ignored) {}
+                      photoUris.add(uri);
+                      Toast.makeText(this, "Dodano zdjęcie z galerii", Toast.LENGTH_SHORT).show();
+                      saveDraft();
+                      render();
+                  }
+              }
+          
+              @Override
+              public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+                  super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+                  if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                      Toast.makeText(this, "Nie przyznano wymaganego uprawnienia", Toast.LENGTH_LONG).show();
+                      return;
+                  }
+                  if (requestCode == REQ_LOCATION) fillLastKnownLocation();
+                  if (requestCode == REQ_CAMERA) takePhoto();
+              }
+          
+              private boolean validateBeforeSend(boolean requireEmailApp) {
+                  if ((ringNumberValue.isEmpty() && ringTextValue.isEmpty()) || (placeValue.isEmpty() && coordinatesValue.isEmpty())) {
+                      Toast.makeText(this, "Uzupełnij obrączkę oraz miejsce lub GPS", Toast.LENGTH_LONG).show();
+                      return false;
+                  }
+                  if (reporterEmailValue.isEmpty() || !reporterEmailValue.contains("@")) {
+                      Toast.makeText(this, "Uzupełnij poprawny e-mail zgłaszającego", Toast.LENGTH_LONG).show();
+                      return false;
+                  }
+                  if (!rodoScientificValue || !rodoPolringValue || !rodoContactValue) {
+                      Toast.makeText(this, "Zaznacz wymagane zgody RODO", Toast.LENGTH_LONG).show();
+                      return false;
+                  }
+                  return true;
+              }
+          
+              private void sendViaGmail() {
+                  updateModelFromFields();
+                  if (!validateBeforeSend(true)) return;
+                  saveDraft();
+                  String subject = "Zgłoszenie ptaka z obrączką";
+                  if (!ringNumberValue.isEmpty()) subject += " — " + ringNumberValue;
+          
+                  Intent intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+                  intent.setType(photoUris.isEmpty() ? "message/rfc822" : "*/*");
+                  intent.putExtra(Intent.EXTRA_EMAIL, new String[]{POLRING_EMAIL});
+                  intent.putExtra(Intent.EXTRA_SUBJECT, subject);
+                  intent.putExtra(Intent.EXTRA_TEXT, buildEmailBody());
+                  if (!photoUris.isEmpty()) {
+                      intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, photoUris);
+                      intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                  }
+          
+                  Intent gmailOnly = new Intent(intent);
+                  gmailOnly.setPackage("com.google.android.gm");
+                  try {
+                      startActivity(gmailOnly);
+                  } catch (ActivityNotFoundException e) {
+                      try {
+                          startActivity(Intent.createChooser(intent, "Wyślij zgłoszenie e-mailem"));
+                      } catch (ActivityNotFoundException ex) {
+                          Toast.makeText(this, "Brak aplikacji e-mail", Toast.LENGTH_LONG).show();
+                      }
+                  }
+              }
+          
+              private String buildEmailBody() {
+                  StringBuilder sb = new StringBuilder();
+                  sb.append("Zgłoszenie ptaka z obrączką\n\n");
+                  sb.append("Adresat: Krajowa Centrala Obrączkowania / POLRING\n");
+                  sb.append("Wiadomość przygotowana w aplikacji POLRING Reporter Android.\n\n");
+          
+                  sb.append("Dane obrączki / znacznika:\n");
+                  sb.append("Numer obrączki / kod: ").append(ringNumberValue).append('\n');
+                  sb.append("Napis na obrączce: ").append(ringTextValue).append('\n');
+                  sb.append("Typ znacznika: ").append(markerTypeValue).append("\n\n");
+          
+                  sb.append("Dane ptaka:\n");
+                  sb.append("Gatunek: ").append(speciesValue).append('\n');
+                  sb.append("Stan ptaka: ").append(birdStateValue).append('\n');
+                  sb.append("Los ptaka: ").append(birdFateValue).append("\n\n");
+          
+                  sb.append("Miejsce i czas:\n");
+                  sb.append("Miejsce: ").append(placeValue).append('\n');
+                  sb.append("Współrzędne GPS: ").append(coordinatesValue).append('\n');
+                  if (!coordinatesValue.isEmpty()) {
+                      sb.append("Mapa: https://maps.google.com/?q=").append(coordinatesValue.replace(" ", "")).append('\n');
+                  }
+                  sb.append("Data: ").append(dateValue).append('\n');
+                  sb.append("Godzina: ").append(timeValue).append("\n\n");
+          
+                  sb.append("Opis / uwagi:\n");
+                  sb.append(descriptionValue).append("\n\n");
+          
+                  sb.append("Dane zgłaszającego:\n");
+                  sb.append("Imię i nazwisko: ").append(reporterNameValue).append('\n');
+                  sb.append("E-mail do odpowiedzi: ").append(reporterEmailValue).append('\n');
+                  sb.append("Telefon: ").append(reporterPhoneValue).append("\n\n");
+          
+                  sb.append("RODO / zgody zaznaczone w aplikacji:\n");
+                  sb.append("- zgoda na przetwarzanie danych osobowych w celach naukowych: TAK\n");
+                  sb.append("- akceptacja przekazania danych do POLRING / KCO: TAK\n");
+                  sb.append("- zgoda na kontakt w celu weryfikacji lub uzupełnienia zgłoszenia: TAK\n\n");
+          
+                  sb.append("Załączniki ze zdjęciami: ").append(photoUris.size()).append('\n');
+                  return sb.toString();
+              }
+          
+              private void saveDraft() {
+                  updateModelFromFields();
+                  try {
+                      JSONObject json = new JSONObject();
+                      json.put("ringNumber", ringNumberValue);
+                      json.put("ringText", ringTextValue);
+                      json.put("markerType", markerTypeValue);
+                      json.put("species", speciesValue);
+                      json.put("birdState", birdStateValue);
+                      json.put("birdFate", birdFateValue);
+                      json.put("place", placeValue);
+                      json.put("coordinates", coordinatesValue);
+                      json.put("date", dateValue);
+                      json.put("time", timeValue);
+                      json.put("description", descriptionValue);
+                      json.put("reporterName", reporterNameValue);
+                      json.put("reporterEmail", reporterEmailValue);
+                      json.put("reporterPhone", reporterPhoneValue);
+                      json.put("rodoScientific", rodoScientificValue);
+                      json.put("rodoPolring", rodoPolringValue);
+                      json.put("rodoContact", rodoContactValue);
+                      JSONArray photos = new JSONArray();
+                      for (Uri uri : photoUris) photos.put(uri.toString());
+                      json.put("photos", photos);
+                      SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+                      prefs.edit().putString(PREF_DRAFT, json.toString()).apply();
+                      Toast.makeText(this, "Szkic zapisany w telefonie", Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                      Toast.makeText(this, "Nie udało się zapisać szkicu", Toast.LENGTH_LONG).show();
+                  }
+              }
+          
+              private void loadDraftToModel() {
+                  try {
+                      String saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString(PREF_DRAFT, null);
+                      if (saved == null) return;
+                      JSONObject json = new JSONObject(saved);
+                      ringNumberValue = json.optString("ringNumber", ringNumberValue);
+                      ringTextValue = json.optString("ringText", ringTextValue);
+                      markerTypeValue = json.optString("markerType", markerTypeValue);
+                      speciesValue = json.optString("species", speciesValue);
+                      birdStateValue = json.optString("birdState", birdStateValue);
+                      birdFateValue = json.optString("birdFate", birdFateValue);
+                      placeValue = json.optString("place", placeValue);
+                      coordinatesValue = json.optString("coordinates", coordinatesValue);
+                      dateValue = json.optString("date", dateValue);
+                      timeValue = json.optString("time", timeValue);
+                      descriptionValue = json.optString("description", descriptionValue);
+                      reporterNameValue = json.optString("reporterName", reporterNameValue);
+                      reporterEmailValue = json.optString("reporterEmail", reporterEmailValue);
+                      reporterPhoneValue = json.optString("reporterPhone", reporterPhoneValue);
+                      rodoScientificValue = json.optBoolean("rodoScientific", false);
+                      rodoPolringValue = json.optBoolean("rodoPolring", false);
+                      rodoContactValue = json.optBoolean("rodoContact", false);
+                      photoUris.clear();
+                      JSONArray photos = json.optJSONArray("photos");
+                      if (photos != null) {
+                          for (int i = 0; i < photos.length(); i++) {
+                              String u = photos.optString(i);
+                              if (u != null && !u.isEmpty()) photoUris.add(Uri.parse(u));
+                          }
+                      }
+                  } catch (Exception ignored) {}
+                  setDefaultDateTimeValues();
+              }
+          
+              private void clearForm() {
+                  ringNumberValue = "";
+                  ringTextValue = "";
+                  markerTypeValue = "Obrączka metalowa";
+                  speciesValue = "";
+                  birdStateValue = "Żywy – zdrowy";
+                  birdFateValue = "Zaobserwowany";
+                  placeValue = "";
+                  coordinatesValue = "";
+                  dateValue = "";
+                  timeValue = "";
+                  descriptionValue = "";
+                  reporterNameValue = "";
+                  reporterEmailValue = "";
+                  reporterPhoneValue = "";
+                  rodoScientificValue = false;
+                  rodoPolringValue = false;
+                  rodoContactValue = false;
+                  photoUris.clear();
+                  setDefaultDateTimeValues();
+                  getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(PREF_DRAFT).apply();
+                  Toast.makeText(this, "Wyczyszczono formularz", Toast.LENGTH_SHORT).show();
+                  step = 0;
+                  render();
+              }
+          
+              private String text(EditText e) {
+                  return e == null ? "" : e.getText().toString().trim();
+              }
+          }
+          EOF_MAIN_JAVA
+          cat > README.md <<'EOF_README'
+          # POLRING Reporter Android — wersja ładna + RODO
+          
+          Aplikacja Android-only do terenowego przygotowania zgłoszenia ptaka z obrączką.
+          
+          ## Funkcje w tej wersji
+          
+          - wygląd inspirowany makietą: zielono-niebieski interfejs, karty, kroki formularza,
+          - ekran danych obrączki i ptaka,
+          - ekran lokalizacji, GPS, zdjęć z aparatu i galerii,
+          - ekran podsumowania,
+          - sekcja RODO z 3 wymaganymi checkboxami,
+          - zapis szkicu lokalnie w telefonie,
+          - przygotowanie wiadomości w Gmailu do `ring@miiz.waw.pl`,
+          - załączanie zdjęć,
+          - otwieranie oficjalnego formularza POLRING.
+          
+          ## Ważna informacja o RODO
+          
+          Teksty zgód są dodane na podstawie informacji widocznych w wynikach wyszukiwania formularza POLRING i strony rejestracji konta. Przed publikacją aplikacji należy porównać treść zgód z aktualnym oficjalnym formularzem POLRING i ewentualnie poprawić tekst w `MainActivity.java`.
+          
+          ## Budowa APK na GitHubie
+          
+          Projekt ma workflow:
+          
+          `.github/workflows/build-apk.yml`
+          
+          Po wrzuceniu repozytorium na GitHub:
+          
+          1. wejdź w zakładkę **Actions**,
+          2. wybierz **Build POLRING Reporter APK**,
+          3. kliknij **Run workflow**,
+          4. po zakończeniu pobierz artifact **PolringReporter-pretty-debug-apk**.
+          
+          ## Instalacja na telefonie
+          
+          Pobrany artifact trzeba rozpakować. W środku będzie plik APK z katalogu:
+          
+          `app/build/outputs/apk/debug/app-debug.apk`
+          
+          Na Androidzie trzeba zezwolić na instalację z nieznanych źródeł.
+          
+          ## Następny etap
+          
+          Ta wersja ma otwieranie mapy systemowej, ale jeszcze nie ma pełnej wbudowanej mapy z klikaniem punktu wewnątrz aplikacji. To można dodać później przez Google Maps SDK albo OpenStreetMap/osmdroid.
+          EOF_README
+          find . -maxdepth 5 -type f | sort
+      - name: Ustaw Javę
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ustaw Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Zbuduj APK debug
+        run: gradle assembleDebug
+
+      - name: Zapisz APK jako artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PolringReporter-pretty-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
