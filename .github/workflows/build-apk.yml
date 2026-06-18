@@ -1,6 +1,7 @@
 name: Build Zgłoś obrączkę APK v9
 
 on:
+# update
   workflow_dispatch:
 
 permissions:
