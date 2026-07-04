@@ -1,4 +1,4 @@
-# Zgłoś obrączkę Android — v12
+# Zgłoś obrączkę Android — v10
 
 Zmiany w v8:
 
@@ -23,8 +23,5 @@ Zmiany w v8:
 - v10: poprawiono wyzwalanie GitHub Actions — workflow uruchamia się ręcznie oraz po każdym pushu, bez ograniczenia do konkretnej gałęzi.
 - v10: poprawiono nazwy plików wynikowych i opis commita APK.
 - v11: usunięto duży obraz PNG/base64 z workflow; logo aplikacji jest teraz stabilnym wektorem Android XML, żeby nie psuło YAML/builda.
-- v12: uproszczono logo do czytelnego symbolu nogi ptaka z obrączką i znacznikiem lokalizacji.
-- v12: raport Word DOCX ma osadzone zdjęcia, a aplikacja generuje również profesjonalny raport PDF z danymi i zdjęciami.
-- v12: przycisk Gmail wysyła komplet: Word DOCX, PDF oraz oryginalne zdjęcia jako załączniki.
 
 Uwaga: formularz POLRING jest zewnętrzną stroną ASP.NET i może zmienić nazwy pól. Dlatego autouzupełnianie ma tryb awaryjny: kopiowanie danych do schowka. Captcha i końcowe zatwierdzenie zawsze trzeba zrobić ręcznie.
