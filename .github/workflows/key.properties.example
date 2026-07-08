@@ -1,0 +1,7 @@
+# Ten plik jest tylko przykładem. Nie wrzucaj prawdziwych haseł do repozytorium.
+# Do GitHub Actions najlepiej użyć Secrets.
+
+storeFile=upload-keystore.jks
+storePassword=TWOJE_HASLO_KEYSTORE
+keyAlias=TWOJ_ALIAS_KLUCZA
+keyPassword=TWOJE_HASLO_KLUCZA

@@ -1,0 +1,46 @@
+      - name: Ustaw Javę
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ustaw Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Przygotuj podpis release, jeśli są secrety
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+            cat > key.properties <<EOF_KEY
+          storeFile=upload-keystore.jks
+          storePassword=${ANDROID_KEYSTORE_PASSWORD}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          keyPassword=${ANDROID_KEY_PASSWORD}
+          EOF_KEY
+            echo "Podpis release przygotowany."
+          else
+            echo "Brak secretu ANDROID_KEYSTORE_BASE64 — AAB może powstać bez podpisu. Do Google Play zwykle potrzebujesz podpisanego AAB."
+          fi
+
+      - name: Zbuduj AAB release
+        run: gradle bundleRelease
+
+      - name: Zapisz AAB jako artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZglosObraczke-release-aab
+          path: app/build/outputs/bundle/release/*.aab
+
+      - name: Skopiuj AAB do repozytorium
+        run: |
+          mkdir -p aab
+          cp app/build/outputs/bundle/release/*.aab aab/ZglosObraczke-release.aab
+          ls -lh aab
