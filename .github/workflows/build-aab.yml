@@ -1,0 +1,255 @@
+name: Build Zgłoś obrączkę AAB
+run-name: Zgłoś obrączkę — budowa AAB release
+
+'on':
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/build-aab.yml'
+      - 'app/**'
+      - 'build.gradle'
+      - 'settings.gradle'
+      - 'gradle.properties'
+
+concurrency:
+  group: zglos-obraczke-aab-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Ten krok pomaga, gdy repo ma tylko stary jednoplikowy workflow build-apk.yml,
+      # który sam tworzył projekt Androida w trakcie budowania.
+      - name: Odtwórz projekt Android ze starego workflow, jeśli brakuje app/build.gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -f app/build.gradle ] || [ -f app/build.gradle.kts ]; then
+            echo "Znaleziono normalny projekt Android. Pomijam odtwarzanie ze starego workflow."
+            exit 0
+          fi
+
+          python3 <<'PY'
+          from pathlib import Path
+          import os
+          import subprocess
+          import sys
+
+          workflow_dir = Path(".github/workflows")
+          candidates = list(workflow_dir.glob("*.yml")) + list(workflow_dir.glob("*.yaml"))
+          skip_names = {"build-aab.yml", "build-aab.yaml"}
+
+          source = None
+          source_lines = None
+
+          for path in candidates:
+              if path.name in skip_names:
+                  continue
+              text = path.read_text(encoding="utf-8", errors="ignore")
+              if "Utwórz projekt Android" in text and "MainActivity.java" in text and "cat > app/build.gradle" in text:
+                  source = path
+                  source_lines = text.splitlines()
+                  break
+
+          if source is None:
+              print("BŁĄD: Nie znaleziono app/build.gradle ani starego workflow z krokiem 'Utwórz projekt Android'.")
+              print("Rozwiązanie: zostaw w repo stary plik build-apk.yml albo wgraj pełny projekt Android.")
+              sys.exit(1)
+
+          print(f"Używam starego workflow jako źródła projektu: {source}")
+
+          start_idx = None
+          for i, line in enumerate(source_lines):
+              if "Utwórz projekt Android" in line:
+                  start_idx = i
+                  break
+
+          run_idx = None
+          for i in range(start_idx, min(start_idx + 30, len(source_lines))):
+              if source_lines[i].strip() == "run: |":
+                  run_idx = i
+                  break
+
+          if run_idx is None:
+              print("BŁĄD: Znalazłem krok 'Utwórz projekt Android', ale nie znalazłem bloku 'run: |'.")
+              sys.exit(1)
+
+          block = []
+          for line in source_lines[run_idx + 1:]:
+              # następny krok w actions ma zwykle taki sam poziom wcięcia
+              if line.startswith("      - name:"):
+                  break
+              block.append(line)
+
+          non_empty_indents = [len(line) - len(line.lstrip(" ")) for line in block if line.strip()]
+          indent = min(non_empty_indents) if non_empty_indents else 0
+          script = "\n".join(line[indent:] if len(line) >= indent else "" for line in block)
+
+          if "cat > app/build.gradle" not in script or "EOF_MAIN_JAVA" not in script:
+              print("BŁĄD: Wyciągnięty blok nie wygląda jak pełny skrypt tworzący aplikację.")
+              sys.exit(1)
+
+          script_path = Path("/tmp/create_zglos_obraczke_project.sh")
+          script_path.write_text("#!/usr/bin/env bash\nset -euo pipefail\n" + script + "\n", encoding="utf-8")
+          os.chmod(script_path, 0o755)
+
+          subprocess.run(["bash", str(script_path)], check=True)
+          print("Projekt Android został odtworzony.")
+          PY
+
+      - name: Ustaw Javę
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ustaw Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+
+      - name: Przygotuj podpisywanie AAB
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Używam klucza z GitHub Secrets."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+
+            STORE_PASS="$ANDROID_KEYSTORE_PASSWORD"
+            KEY_ALIAS="$ANDROID_KEY_ALIAS"
+            KEY_PASS="$ANDROID_KEY_PASSWORD"
+            AAB_LABEL="SIGNED_WITH_SECRETS"
+          else
+            echo "UWAGA: Brak ANDROID_KEYSTORE_BASE64 w Secrets."
+            echo "Tworzę TYMCZASOWY klucz tylko po to, żeby AAB się zbudował."
+            echo "Nie polecam wrzucać takiego AAB do Google Play, bo następna aktualizacja może mieć inny klucz."
+
+            STORE_PASS="tymczasowe_haslo_123456"
+            KEY_ALIAS="upload"
+            KEY_PASS="tymczasowe_haslo_123456"
+            AAB_LABEL="TEMPORARY_KEY_DO_NOT_USE_FOR_GOOGLE_PLAY"
+
+            keytool -genkeypair \
+              -keystore upload-keystore.jks \
+              -storepass "$STORE_PASS" \
+              -keypass "$KEY_PASS" \
+              -alias "$KEY_ALIAS" \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Bartosz Lawicki, OU=Zglos Obraczke, O=Personal, L=Gdansk, ST=Pomorskie, C=PL"
+          fi
+
+          cat > signing.gradle <<'EOF_SIGNING_GRADLE'
+          android {
+              signingConfigs {
+                  release {
+                      storeFile rootProject.file("upload-keystore.jks")
+                      storePassword System.getenv("STORE_PASS")
+                      keyAlias System.getenv("KEY_ALIAS")
+                      keyPassword System.getenv("KEY_PASS")
+                  }
+              }
+              buildTypes {
+                  release {
+                      signingConfig signingConfigs.release
+                  }
+              }
+          }
+          EOF_SIGNING_GRADLE
+
+          if [ -f app/build.gradle ]; then
+            grep -q "signing.gradle" app/build.gradle || echo "apply from: rootProject.file('signing.gradle')" >> app/build.gradle
+          else
+            echo "BŁĄD: Brak app/build.gradle po odtworzeniu projektu."
+            exit 1
+          fi
+
+          echo "STORE_PASS=$STORE_PASS" >> "$GITHUB_ENV"
+          echo "KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "KEY_PASS=$KEY_PASS" >> "$GITHUB_ENV"
+          echo "AAB_LABEL=$AAB_LABEL" >> "$GITHUB_ENV"
+
+          echo "Podgląd app/build.gradle:"
+          sed -n '1,220p' app/build.gradle
+
+      - name: Zbuduj AAB release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Przygotuj AAB do pobrania
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p aab
+          AAB_FILE="$(find app/build/outputs/bundle/release -name '*.aab' | head -1)"
+
+          if [ -z "$AAB_FILE" ]; then
+            echo "BŁĄD: Nie znaleziono pliku AAB."
+            find app/build/outputs -type f | sort || true
+            exit 1
+          fi
+
+          if [ "${AAB_LABEL:-}" = "SIGNED_WITH_SECRETS" ]; then
+            OUT_NAME="ZglosObraczke-release-signed.aab"
+          else
+            OUT_NAME="ZglosObraczke-release-TEMPORARY-KEY-NIE-DO-GOOGLE-PLAY.aab"
+          fi
+
+          cp "$AAB_FILE" "aab/$OUT_NAME"
+          cp "$AAB_FILE" "aab/ZglosObraczke-release.aab"
+
+          echo "AAB_FILE_NAME=$OUT_NAME" >> "$GITHUB_ENV"
+          ls -lah aab
+
+      - name: Zapisz AAB jako artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZglosObraczke-release-aab
+          path: aab/*.aab
+          if-no-files-found: error
+
+      # Dodatkowo wrzuca AAB do zakładki Code w repo.
+      # Gdy GitHub odmówi wrzucenia pliku binarnego, artifact powyżej nadal zostaje do pobrania.
+      - name: Wgraj AAB do zakładki Code
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BRANCH="${GITHUB_REF_NAME:-main}"
+
+          mkdir -p /tmp/zglos-obraczke-aab
+          cp aab/*.aab /tmp/zglos-obraczke-aab/
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin "$BRANCH"
+          git reset --hard "origin/$BRANCH"
+
+          mkdir -p aab
+          cp /tmp/zglos-obraczke-aab/*.aab aab/
+
+          git add aab/*.aab
+          git commit -m "Zbuduj AAB release [skip ci]" || echo "Brak zmian do commita"
+          git push origin HEAD:"$BRANCH"
