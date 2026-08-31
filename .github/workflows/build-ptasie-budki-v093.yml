@@ -1,0 +1,137 @@
+name: Buduj Ptasie Budki v0.9.3
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "PTASIE_BUDKI_v093.zip"
+      - ".github/workflows/build-ptasie-budki-v093.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Ustaw Javę
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Ustaw Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Rozpakuj projekt
+        run: |
+          rm -rf app
+          mkdir app
+          unzip -q "PTASIE_BUDKI_v093.zip" -d app
+
+      - name: Wygeneruj projekt Android
+        working-directory: app
+        run: |
+          rm -rf android
+          flutter create --platforms android --org pl.bartoszlawicki .
+
+      - name: Zastosuj ustawienia Ptasich Budek
+        working-directory: app
+        run: |
+          python3 tool/patch_android_variant.py
+          if [ -f tool/patch_android_native_file_picker.py ]; then python3 tool/patch_android_native_file_picker.py; fi
+          if [ -f tool/patch_android_manifest.py ]; then python3 tool/patch_android_manifest.py || true; fi
+          if [ -f tool/patch_android_manifest_auth.py ]; then python3 tool/patch_android_manifest_auth.py || true; fi
+          if [ -f tool/patch_android_compile_sdk.py ]; then python3 tool/patch_android_compile_sdk.py || true; fi
+
+      - name: Pobierz zależności
+        working-directory: app
+        run: flutter pub get
+
+      - name: Zbuduj APK
+        working-directory: app
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_OAUTH_REDIRECT_TO: ${{ secrets.SUPABASE_OAUTH_REDIRECT_TO }}
+        run: |
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
+            --dart-define=APP_VERSION_NAME="0.9.3" \
+            --dart-define=APP_VERSION_CODE="98"
+
+      - name: Przygotuj stały klucz podpisu
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64_PART_1: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_1 }}
+          ANDROID_KEYSTORE_BASE64_PART_2: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_2 }}
+          ANDROID_KEYSTORE_BASE64_PART_3: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_3 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}" ]; then
+            test -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" && test -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" && test -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}"
+            PART_1="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_1" | tr -d '[:space:]')"
+            PART_2="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_2" | tr -d '[:space:]')"
+            PART_3="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_3" | tr -d '[:space:]')"
+            RAW_KEYSTORE_BASE64="${PART_1#ANDROID_KEYSTORE_BASE64_PART_1=}${PART_2#ANDROID_KEYSTORE_BASE64_PART_2=}${PART_3#ANDROID_KEYSTORE_BASE64_PART_3=}"
+          else
+            RAW_KEYSTORE_BASE64="${ANDROID_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
+          fi
+          test -n "$RAW_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          printf '%s' "$RAW_KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > upload-keystore.jks
+          printf 'SIGNING_STORE_PASSWORD=%s\n' "${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}" >> "$GITHUB_ENV"
+          printf 'SIGNING_KEY_ALIAS=%s\n' "${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}" >> "$GITHUB_ENV"
+          printf 'SIGNING_KEY_PASSWORD=%s\n' "${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}" >> "$GITHUB_ENV"
+
+      - name: Podpisz i sprawdź APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          mkdir -p release
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-budki-v093-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks upload-keystore.jks \
+            --ks-key-alias "$SIGNING_KEY_ALIAS" \
+            --ks-pass "env:SIGNING_STORE_PASSWORD" \
+            --key-pass "env:SIGNING_KEY_PASSWORD" \
+            --out release/ptasie-budki-v093.apk \
+            release/ptasie-budki-v093-aligned.apk
+          rm release/ptasie-budki-v093-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-budki-v093.apk
+          sha256sum release/ptasie-budki-v093.apk > release/ptasie-budki-v093.apk.sha256
+
+      - name: Zapisz APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Budki-v093
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Utwórz wydanie
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ptasie_budki-v0.9.3
+          name: Ptasie Budki v0.9.3
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
