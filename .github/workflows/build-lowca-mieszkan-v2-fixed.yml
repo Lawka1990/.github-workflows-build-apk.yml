@@ -1,0 +1,122 @@
+name: Build Lowca Mieszkan v2 Fixed
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - lowca-mieszkan-v2
+      - main
+    paths:
+      - ".github/workflows/build-lowca-mieszkan-v2-fixed.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Flutter stable
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Reconstruct source from v2 workflow
+        run: |
+          rm -rf lowca_mieszkan_build
+          mkdir -p lowca_mieszkan_build/lib
+          python3 - <<'PY'
+          import base64, re, zlib
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/build-lowca-mieszkan-v2.yml').read_text(encoding='utf-8')
+          mapping = {
+              'MAIN_DART_Z': Path('lowca_mieszkan_build/lib/main.dart'),
+              'PUBSPEC_Z': Path('lowca_mieszkan_build/pubspec.yaml'),
+              'README_Z': Path('lowca_mieszkan_build/README.md'),
+          }
+          for key, dest in mapping.items():
+              m = re.search(r'^\s*' + re.escape(key) + r':\s*"([^"]+)"\s*$', workflow, re.M)
+              if not m:
+                  raise SystemExit(f'Nie znaleziono {key}')
+              dest.parent.mkdir(parents=True, exist_ok=True)
+              dest.write_bytes(zlib.decompress(base64.b64decode(m.group(1))))
+              print('created', dest, dest.stat().st_size, 'bytes')
+          PY
+
+      - name: Generate Android project
+        working-directory: lowca_mieszkan_build
+        run: flutter create --platforms=android --org pl.bartoszlawicki --project-name lowca_mieszkan .
+
+      - name: Patch Android and remove template tests
+        working-directory: lowca_mieszkan_build
+        run: |
+          rm -rf test
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          for path in [Path('android/app/build.gradle.kts'), Path('android/app/build.gradle')]:
+              if not path.exists():
+                  continue
+              text = path.read_text(encoding='utf-8')
+              text = text.replace('minSdk = flutter.minSdkVersion', 'minSdk = 24')
+              text = text.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 24')
+              text = re.sub(r'compileSdk\s*=\s*\d+', 'compileSdk = 36', text)
+              text = re.sub(r'targetSdk\s*=\s*\d+', 'targetSdk = 36', text)
+              text = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 36', text)
+              text = re.sub(r'targetSdkVersion\s+\d+', 'targetSdkVersion 36', text)
+              path.write_text(text, encoding='utf-8')
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text(encoding='utf-8')
+          if 'android.permission.INTERNET' not in text:
+              start = text.find('<manifest')
+              end = text.find('>', start)
+              text = text[:end + 1] + '\n    <uses-permission android:name="android.permission.INTERNET" />' + text[end + 1:]
+          manifest.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Get dependencies
+        working-directory: lowca_mieszkan_build
+        run: flutter pub get
+
+      - name: Analyze app code
+        working-directory: lowca_mieszkan_build
+        run: flutter analyze lib --no-fatal-infos --no-fatal-warnings
+
+      - name: Build APK
+        working-directory: lowca_mieszkan_build
+        run: flutter build apk --release --no-tree-shake-icons
+
+      - name: Build AAB
+        working-directory: lowca_mieszkan_build
+        run: flutter build appbundle --release --no-tree-shake-icons
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p lowca_mieszkan_artifacts
+          cp lowca_mieszkan_build/build/app/outputs/flutter-apk/app-release.apk lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0.apk
+          cp lowca_mieszkan_build/build/app/outputs/bundle/release/app-release.aab lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0.aab
+          cd lowca_mieszkan_build
+          zip -rq ../lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0-source.zip . -x '.dart_tool/*' 'build/*'
+          cd ..
+          ls -lah lowca_mieszkan_artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lowca-mieszkan-v2-fixed
+          path: lowca_mieszkan_artifacts/*
+          if-no-files-found: error
