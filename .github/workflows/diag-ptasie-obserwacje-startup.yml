@@ -1,0 +1,28 @@
+name: Diagnostyka startu Ptasie Obserwacje
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diag-ptasie-obserwacje-startup.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Pokaż kod startowy aplikacji
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '===== lib/main.dart: początek ====='
+          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart | nl -ba | sed -n '1,260p'
+          echo '===== trafienia start / Supabase ====='
+          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart | nl -ba | grep -Ei 'main\(|runApp|Supabase\.initialize|WidgetsFlutterBinding|ensureInitialized|SharedPreferences|FlutterNativeSplash|initialize' || true
+          echo '===== pubspec ====='
+          unzip -p PTASIE_OBSERWACJE_v093.zip pubspec.yaml | sed -n '1,220p'
