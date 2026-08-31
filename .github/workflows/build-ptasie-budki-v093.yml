@@ -1,4 +1,4 @@
-name: Buduj Ptasie Budki v0.9.3
+name: Buduj Ptasie Budki v0.9.4
 
 on:
   workflow_dispatch:
@@ -60,16 +60,20 @@ jobs:
       - name: Zbuduj APK
         working-directory: app
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_URL: https://ksskwqcbnultkwxjsgor.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_h7hTCQnCsGGN_MWswivJAA_ILjb3p6M
           SUPABASE_OAUTH_REDIRECT_TO: ${{ secrets.SUPABASE_OAUTH_REDIRECT_TO }}
         run: |
+          set -euo pipefail
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_ANON_KEY"
+          echo "Konfiguracja Supabase: OK"
           flutter build apk --release \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
-            --dart-define=APP_VERSION_NAME="0.9.3" \
-            --dart-define=APP_VERSION_CODE="98"
+            --dart-define=APP_VERSION_NAME="0.9.4" \
+            --dart-define=APP_VERSION_CODE="100"
 
       - name: Przygotuj stały klucz podpisu
         shell: bash
@@ -107,22 +111,22 @@ jobs:
           set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           mkdir -p release
-          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-budki-v093-aligned.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-budki-v094-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks upload-keystore.jks \
             --ks-key-alias "$SIGNING_KEY_ALIAS" \
             --ks-pass "env:SIGNING_STORE_PASSWORD" \
             --key-pass "env:SIGNING_KEY_PASSWORD" \
-            --out release/ptasie-budki-v093.apk \
-            release/ptasie-budki-v093-aligned.apk
-          rm release/ptasie-budki-v093-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-budki-v093.apk
-          sha256sum release/ptasie-budki-v093.apk > release/ptasie-budki-v093.apk.sha256
+            --out release/ptasie-budki-v094.apk \
+            release/ptasie-budki-v094-aligned.apk
+          rm release/ptasie-budki-v094-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-budki-v094.apk
+          sha256sum release/ptasie-budki-v094.apk > release/ptasie-budki-v094.apk.sha256
 
       - name: Zapisz APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ptasie-Budki-v093
+          name: Ptasie-Budki-v094
           path: release/*
           if-no-files-found: error
           retention-days: 90
@@ -130,8 +134,8 @@ jobs:
       - name: Utwórz wydanie
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ptasie_budki-v0.9.3
-          name: Ptasie Budki v0.9.3
+          tag_name: ptasie_budki-v0.9.4
+          name: Ptasie Budki v0.9.4
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
