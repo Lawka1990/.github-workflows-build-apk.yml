@@ -1,4 +1,4 @@
-name: Buduj Ptasie Obserwacje v0.9.4
+name: Buduj Ptasie Obserwacje v0.9.5
 
 on:
   workflow_dispatch:
@@ -38,6 +38,23 @@ jobs:
           mkdir app
           unzip -q "PTASIE_OBSERWACJE_v093.zip" -d app
 
+      - name: Napraw zawieszanie na ekranie startowym
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('lib/main.dart')
+          s = p.read_text(encoding='utf-8')
+          old = "      );\n      supabaseReady = true;"
+          new = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
+          if old not in s:
+              raise SystemExit('Nie znaleziono miejsca do dodania timeoutu Supabase')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Wygeneruj projekt Android
         working-directory: app
         run: |
@@ -72,8 +89,8 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
-            --dart-define=APP_VERSION_NAME="0.9.4" \
-            --dart-define=APP_VERSION_CODE="101"
+            --dart-define=APP_VERSION_NAME="0.9.5" \
+            --dart-define=APP_VERSION_CODE="102"
 
       - name: Przygotuj stały klucz podpisu
         shell: bash
@@ -111,22 +128,22 @@ jobs:
           set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           mkdir -p release
-          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v094-aligned.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v095-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks upload-keystore.jks \
             --ks-key-alias "$SIGNING_KEY_ALIAS" \
             --ks-pass "env:SIGNING_STORE_PASSWORD" \
             --key-pass "env:SIGNING_KEY_PASSWORD" \
-            --out release/ptasie-obserwacje-v094.apk \
-            release/ptasie-obserwacje-v094-aligned.apk
-          rm release/ptasie-obserwacje-v094-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v094.apk
-          sha256sum release/ptasie-obserwacje-v094.apk > release/ptasie-obserwacje-v094.apk.sha256
+            --out release/ptasie-obserwacje-v095.apk \
+            release/ptasie-obserwacje-v095-aligned.apk
+          rm release/ptasie-obserwacje-v095-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v095.apk
+          sha256sum release/ptasie-obserwacje-v095.apk > release/ptasie-obserwacje-v095.apk.sha256
 
       - name: Zapisz APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ptasie-Obserwacje-v094
+          name: Ptasie-Obserwacje-v095
           path: release/*
           if-no-files-found: error
           retention-days: 90
@@ -134,8 +151,8 @@ jobs:
       - name: Utwórz wydanie
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ptasie_obserwacje-v0.9.4
-          name: Ptasie Obserwacje v0.9.4
+          tag_name: ptasie_obserwacje-v0.9.5
+          name: Ptasie Obserwacje v0.9.5
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
