@@ -1,0 +1,61 @@
+name: Zastosuj patch v27 i uruchom build
+
+'on':
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/apply-v27-patch.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: apply-v27-patch
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Zastosuj patch i posprzątaj
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          PATCH_FILE='0001-Przygotuj-v27-do-wydania-w-Google-Play-3.patch'
+          HELPER_FILE='.github/workflows/apply-v27-patch.yml'
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --rebase origin main
+
+          git am --3way "$PATCH_FILE"
+          git rm "$PATCH_FILE" "$HELPER_FILE"
+          git commit --amend --no-edit
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin HEAD:main; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              exit 1
+            fi
+            sleep 5
+          done
+
+          for attempt in 1 2 3 4 5; do
+            if gh workflow run release-google-play.yml --ref main; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
