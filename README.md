@@ -1,27 +1,22 @@
-# Zgłoś obrączkę Android — v10
+# Zgłoś obrączkę — Android v27
 
-Zmiany w v8:
+Aplikacja pomaga przygotować kompletne zgłoszenie obserwacji zaobrączkowanego ptaka. Działa bez konta i bez własnego serwera.
 
-- poprawiono błąd kompilacji w regexie wyboru godziny,
-- poprawiono walidację e-maila przez Android Patterns.EMAIL_ADDRESS,
-- dodano walidację formatu współrzędnych GPS przed wysyłką,
-- poprawiono przekazywanie uprawnień do załączników przez ClipData,
-- dodano zabezpieczenie, gdy usługa lokalizacji jest niedostępna,
-- uporządkowano nieużywane importy,
-- pola z wieloma opcjami są listami rozwijanymi: typ znacznika, stan ptaka, los ptaka,
-- pole gatunku ma podpowiedzi popularnych gatunków ptaków,
-- ekran lokalizacji pokazuje wbudowaną mapę OpenStreetMap z markerem dla wpisanych współrzędnych,
-- pole daty otwiera kalendarz Androida, a pole godziny otwiera wybór godziny,
-- przycisk formularza POLRING otwiera formularz wewnątrz aplikacji i próbuje wypełnić pola JavaScriptem po załadowaniu strony,
-- pełne zgłoszenie jest też kopiowane do schowka jako awaryjna metoda wklejenia,
-- nadal działa Gmail, zdjęcia, GPS, zapis szkicu i RODO,
-- dodano wysyłkę formularza jako edytowalny plik Word DOCX przez Gmail,
-- v9: ikonę Androida i logo w nagłówku zastąpiono obrazem PNG z ziębą, takim jak w zatwierdzonej makiecie,
-- v9: przycisk GPS od razu wpisuje współrzędne w pole, zapisuje szkic i odświeża marker na mapie,
-- v9: poprawiono parsowanie współrzędnych również dla formatów z polskim przecinkiem dziesiętnym.
+## Funkcje
 
-- v10: poprawiono wyzwalanie GitHub Actions — workflow uruchamia się ręcznie oraz po każdym pushu, bez ograniczenia do konkretnej gałęzi.
-- v10: poprawiono nazwy plików wynikowych i opis commita APK.
-- v11: usunięto duży obraz PNG/base64 z workflow; logo aplikacji jest teraz stabilnym wektorem Android XML, żeby nie psuło YAML/builda.
+- dane obrączki i ptaka zgodne z zakresem formularza POLRING,
+- zdjęcia z aparatu lub systemowego selektora plików,
+- GPS i przyrodniczy podgląd lokalizacji działający bez WebView,
+- lokalny zapis szkicu,
+- raporty DOCX, PDF, CSV i XLSX,
+- wysyłanie raportu oraz zdjęć przez aplikację pocztową,
+- poprawny pakiet Google Play: `pl.bartoszlawicki.zglosobraczke`,
+- zgodność z wymaganiem Google Play dotyczącym Androida 16 / API 36.
 
-Uwaga: formularz POLRING jest zewnętrzną stroną ASP.NET i może zmienić nazwy pól. Dlatego autouzupełnianie ma tryb awaryjny: kopiowanie danych do schowka. Captcha i końcowe zatwierdzenie zawsze trzeba zrobić ręcznie.
+## Budowanie
+
+Aktualny workflow: `.github/workflows/release-google-play.yml`.
+
+Po każdym uruchomieniu powstaje testowy APK. Podpisany AAB powstaje wyłącznie wtedy, gdy skonfigurowano stały klucz wydawniczy w GitHub Secrets. Workflow nigdy nie zastępuje brakującego klucza losowym podpisem.
+
+Szczegóły publikacji znajdują się w `PLAY_STORE_CHECKLIST.md`, a zasady prywatności w `PRIVACY_POLICY.md`.
