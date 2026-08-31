@@ -3319,6 +3319,9 @@ jobs:
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64_PART_1: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_1 }}
+          ANDROID_KEYSTORE_BASE64_PART_2: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_2 }}
+          ANDROID_KEYSTORE_BASE64_PART_3: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_3 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -3326,11 +3329,32 @@ jobs:
           set -euo pipefail
 
           missing=()
-          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for variable in ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
             if [ -z "${!variable:-}" ]; then
               missing+=("$variable")
             fi
           done
+
+          if [ -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}" ]; then
+            for variable in ANDROID_KEYSTORE_BASE64_PART_1 ANDROID_KEYSTORE_BASE64_PART_2 ANDROID_KEYSTORE_BASE64_PART_3; do
+              if [ -z "${!variable:-}" ]; then
+                missing+=("$variable")
+              fi
+            done
+
+            PART_1="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_1" | tr -d '[:space:]')"
+            PART_2="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_2" | tr -d '[:space:]')"
+            PART_3="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_3" | tr -d '[:space:]')"
+            PART_1="${PART_1#ANDROID_KEYSTORE_BASE64_PART_1=}"
+            PART_2="${PART_2#ANDROID_KEYSTORE_BASE64_PART_2=}"
+            PART_3="${PART_3#ANDROID_KEYSTORE_BASE64_PART_3=}"
+            RAW_KEYSTORE_BASE64="${PART_1}${PART_2}${PART_3}"
+          else
+            if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+              missing+=("ANDROID_KEYSTORE_BASE64")
+            fi
+            RAW_KEYSTORE_BASE64="$ANDROID_KEYSTORE_BASE64"
+          fi
 
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "::error::Brakuje GitHub Secrets: ${missing[*]}"
@@ -3338,7 +3362,7 @@ jobs:
             exit 1
           fi
 
-          NORMALIZED_KEYSTORE_BASE64="$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]')"
+          NORMALIZED_KEYSTORE_BASE64="$(printf '%s' "$RAW_KEYSTORE_BASE64" | tr -d '[:space:]')"
           NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
           NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64#\"}"
           NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64%\"}"
