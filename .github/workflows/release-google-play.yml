@@ -3338,20 +3338,38 @@ jobs:
             exit 1
           fi
 
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks
+          NORMALIZED_KEYSTORE_BASE64="$(printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '[:space:]')"
+          NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
+          NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64#\"}"
+          NORMALIZED_KEYSTORE_BASE64="${NORMALIZED_KEYSTORE_BASE64%\"}"
+
+          SIGNING_STORE_PASSWORD="${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}"
+          SIGNING_KEY_ALIAS="${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}"
+          SIGNING_KEY_PASSWORD="${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}"
+
+          if ! printf '%s' "$NORMALIZED_KEYSTORE_BASE64" | base64 --decode > upload-keystore.jks; then
+            echo "::error::Sekret ANDROID_KEYSTORE_BASE64 nie jest prawidłowym Base64. Wklej pełną wartość bez nazwy sekretu."
+            exit 1
+          fi
+
+          {
+            printf 'SIGNING_STORE_PASSWORD=%s\n' "$SIGNING_STORE_PASSWORD"
+            printf 'SIGNING_KEY_ALIAS=%s\n' "$SIGNING_KEY_ALIAS"
+            printf 'SIGNING_KEY_PASSWORD=%s\n' "$SIGNING_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
           keytool -list \
             -keystore upload-keystore.jks \
-            -storepass "$ANDROID_KEYSTORE_PASSWORD" \
-            -alias "$ANDROID_KEY_ALIAS" >/dev/null
+            -storepass "$SIGNING_STORE_PASSWORD" \
+            -alias "$SIGNING_KEY_ALIAS" >/dev/null
 
           cat > signing.gradle <<'EOF_SIGNING'
           android {
               signingConfigs {
                   release {
                       storeFile rootProject.file('upload-keystore.jks')
-                      storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
-                      keyAlias System.getenv('ANDROID_KEY_ALIAS')
-                      keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+                      storePassword System.getenv('SIGNING_STORE_PASSWORD')
+                      keyAlias System.getenv('SIGNING_KEY_ALIAS')
+                      keyPassword System.getenv('SIGNING_KEY_PASSWORD')
                   }
               }
               buildTypes {
