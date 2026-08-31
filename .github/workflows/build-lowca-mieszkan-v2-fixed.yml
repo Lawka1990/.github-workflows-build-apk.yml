@@ -1,10 +1,9 @@
-name: Build Lowca Mieszkan v2 Fixed
+name: Build Lowca Mieszkan v2
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - lowca-mieszkan-v2
       - main
     paths:
       - ".github/workflows/build-lowca-mieszkan-v2-fixed.yml"
@@ -32,15 +31,17 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Reconstruct source from v2 workflow
+      - name: Reconstruct Lowca Mieszkan source
         run: |
           rm -rf lowca_mieszkan_build
           mkdir -p lowca_mieszkan_build/lib
+          git fetch --depth=1 origin lowca-mieszkan-source-v2
+          git show FETCH_HEAD:.github/workflows/build-lowca-mieszkan-v2.yml > /tmp/lowca-source-workflow.yml
           python3 - <<'PY'
           import base64, re, zlib
           from pathlib import Path
 
-          workflow = Path('.github/workflows/build-lowca-mieszkan-v2.yml').read_text(encoding='utf-8')
+          workflow = Path('/tmp/lowca-source-workflow.yml').read_text(encoding='utf-8')
           mapping = {
               'MAIN_DART_Z': Path('lowca_mieszkan_build/lib/main.dart'),
               'PUBSPEC_Z': Path('lowca_mieszkan_build/pubspec.yaml'),
@@ -117,6 +118,6 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lowca-mieszkan-v2-fixed
+          name: lowca-mieszkan-v2
           path: lowca_mieszkan_artifacts/*
           if-no-files-found: error
