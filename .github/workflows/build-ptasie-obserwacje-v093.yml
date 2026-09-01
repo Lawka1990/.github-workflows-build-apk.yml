@@ -47,45 +47,16 @@ jobs:
           from pathlib import Path
           p = Path('lib/main.dart')
           s = p.read_text(encoding='utf-8')
-
           old_supabase = "      );\n      supabaseReady = true;"
           new_supabase = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
           if old_supabase not in s:
               raise SystemExit('Nie znaleziono inicjalizacji Supabase')
           s = s.replace(old_supabase, new_supabase, 1)
-
-          old_nav = """      bottomNavigationBar: SafeArea(
-        top: false,
-        minimum: const EdgeInsets.only(bottom: 10),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-          child: NavigationBar(
-            height: 72,
-            selectedIndex: min(state.currentTab, items.length - 1),
-            onDestinationSelected: state.setTab,
-            destinations: items,
-          ),
-        ),
-      ),"""
-          new_nav = """      bottomNavigationBar: items.length < 2
-          ? null
-          : SafeArea(
-              top: false,
-              minimum: const EdgeInsets.only(bottom: 10),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                child: NavigationBar(
-                  height: 72,
-                  selectedIndex: min(state.currentTab, items.length - 1),
-                  onDestinationSelected: state.setTab,
-                  destinations: items,
-                ),
-              ),
-            ),"""
+          old_nav = "      bottomNavigationBar: SafeArea(\n        top: false,\n        minimum: const EdgeInsets.only(bottom: 10),\n        child: Padding(\n          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n          child: NavigationBar(\n            height: 72,\n            selectedIndex: min(state.currentTab, items.length - 1),\n            onDestinationSelected: state.setTab,\n            destinations: items,\n          ),\n        ),\n      ),"
+          new_nav = "      bottomNavigationBar: items.length < 2\n          ? null\n          : SafeArea(\n              top: false,\n              minimum: const EdgeInsets.only(bottom: 10),\n              child: Padding(\n                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n                child: NavigationBar(\n                  height: 72,\n                  selectedIndex: min(state.currentTab, items.length - 1),\n                  onDestinationSelected: state.setTab,\n                  destinations: items,\n                ),\n              ),\n            ),"
           if old_nav not in s:
               raise SystemExit('Nie znaleziono dolnego paska nawigacji')
           s = s.replace(old_nav, new_nav, 1)
-
           p.write_text(s, encoding='utf-8')
           PY
 
