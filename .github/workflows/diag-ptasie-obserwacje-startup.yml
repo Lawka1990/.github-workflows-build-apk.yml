@@ -16,13 +16,14 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Pokaż kod startowy aplikacji
+      - name: Sprawdź AppState i ekran główny
         shell: bash
         run: |
           set -euo pipefail
-          echo '===== lib/main.dart: początek ====='
-          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart | nl -ba | sed -n '1,260p'
-          echo '===== trafienia start / Supabase ====='
-          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart | nl -ba | grep -Ei 'main\(|runApp|Supabase\.initialize|WidgetsFlutterBinding|ensureInitialized|SharedPreferences|FlutterNativeSplash|initialize' || true
-          echo '===== pubspec ====='
-          unzip -p PTASIE_OBSERWACJE_v093.zip pubspec.yaml | sed -n '1,220p'
+          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
+          echo '===== klasy / init / HomePage ====='
+          nl -ba /tmp/main.dart | grep -E 'class AppState|class HomePage|Future<void> init|void initState|Widget build|Scaffold|FutureBuilder|StreamBuilder' | head -n 160 || true
+          echo '===== linie 300-900 ====='
+          nl -ba /tmp/main.dart | sed -n '300,900p'
+          echo '===== linie 900-1500 ====='
+          nl -ba /tmp/main.dart | sed -n '900,1500p'
