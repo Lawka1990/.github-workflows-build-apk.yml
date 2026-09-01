@@ -42,7 +42,8 @@ jobs:
 
       - name: Ustaw wersję 0.9.8
         working-directory: app
-        run: sed -i 's/^version: .*/version: 0.9.8+105/' pubspec.yaml
+        run: |
+          sed -i 's/^version: .*/version: 0.9.8+105/' pubspec.yaml
 
       - name: Usuń opis wersji spod mapy
         run: python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
@@ -195,7 +196,7 @@ jobs:
           arch: x86_64
           profile: pixel_6
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          emulator-options: "-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim"
           script: |
             set -euo pipefail
             python3 -m pip install --quiet pillow
