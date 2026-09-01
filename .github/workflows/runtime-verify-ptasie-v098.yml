@@ -32,8 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           ls -lh release
-          cd release
-          sha256sum -c ptasie-obserwacje-v098.apk.sha256
+          sha256sum -c release/ptasie-obserwacje-v098.apk.sha256
 
       - name: Włącz KVM
         shell: bash
