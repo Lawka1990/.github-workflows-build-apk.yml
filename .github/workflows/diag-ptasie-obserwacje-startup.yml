@@ -16,10 +16,10 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Sprawdź BirdObservationsPage
+      - name: Sprawdź właściwy ekran obserwacji
         shell: bash
         run: |
           set -euo pipefail
           unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          echo '===== BirdObservationsPage 4350-4625 ====='
-          nl -ba /tmp/main.dart | sed -n '4350,4625p'
+          echo '===== linie 4770-5100 ====='
+          nl -ba /tmp/main.dart | sed -n '4770,5100p'
