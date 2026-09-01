@@ -16,9 +16,39 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Sprawdź ekran i mapę obserwacji
+      - name: Ustaw Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Rozpakuj projekt
+        run: |
+          rm -rf app
+          mkdir app
+          unzip -q PTASIE_OBSERWACJE_v093.zip -d app
+
+      - name: Test pierwszej klatki UI
+        working-directory: app
         shell: bash
         run: |
           set -euo pipefail
-          unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          nl -ba /tmp/main.dart | sed -n '5590,5900p'
+          flutter pub get
+          mkdir -p test
+          cat > test/startup_test.dart <<'DART'
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'package:ptasie_obserwacje/main.dart';
+
+          void main() {
+            testWidgets('Ptasie Obserwacje renderuje pierwszy ekran bez Supabase', (tester) async {
+              SharedPreferences.setMockInitialValues({});
+              await tester.pumpWidget(const PtasiaApp(supabaseReady: false));
+              await tester.pump();
+              expect(find.text('Ptasie Obserwacje'), findsWidgets);
+              expect(tester.takeException(), isNull);
+            });
+          }
+          DART
+          flutter test test/startup_test.dart -r expanded
