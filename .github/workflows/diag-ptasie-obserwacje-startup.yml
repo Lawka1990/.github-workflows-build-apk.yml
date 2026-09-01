@@ -16,9 +16,9 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Znajdź klasę ekranu obserwacji
+      - name: Sprawdź ekran i mapę obserwacji
         shell: bash
         run: |
           set -euo pipefail
           unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          grep -n -E 'class .*Bird.*Observation|BirdObservationsPage|BirdObservation' /tmp/main.dart | head -n 120
+          nl -ba /tmp/main.dart | sed -n '5590,5900p'
