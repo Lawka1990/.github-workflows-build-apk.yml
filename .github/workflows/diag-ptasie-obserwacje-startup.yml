@@ -2,6 +2,10 @@ name: Diagnostyka startu Ptasie Obserwacje
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diag-ptasie-obserwacje-startup.yml"
 
 permissions:
   contents: read
@@ -12,12 +16,35 @@ jobs:
     steps:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
-      - name: Pokaż patche Android
+
+      - name: Rozpakuj i pokaż kluczowe fragmenty źródeł
         shell: bash
         run: |
           set -euo pipefail
-          unzip -p PTASIE_OBSERWACJE_v093.zip tool/patch_android_variant.py || true
-          echo '--- manifest ---'
-          unzip -p PTASIE_OBSERWACJE_v093.zip tool/patch_android_manifest.py || true
-          echo '--- auth ---'
-          unzip -p PTASIE_OBSERWACJE_v093.zip tool/patch_android_manifest_auth.py || true
+          rm -rf /tmp/ptasie-src
+          mkdir -p /tmp/ptasie-src
+          unzip -q PTASIE_OBSERWACJE_v093.zip -d /tmp/ptasie-src
+          echo '=== PUBSPEC ==='
+          sed -n '1,220p' /tmp/ptasie-src/pubspec.yaml
+          echo '=== MAIN START ==='
+          sed -n '1,280p' /tmp/ptasie-src/lib/main.dart
+          echo '=== STARTUP MATCHES ==='
+          grep -nE 'void main|runApp|class PtasiaApp|Widget build|initState|Supabase|supabaseReady|MaterialApp|Scaffold|NavigationBar|currentTab|items =|FutureBuilder|StreamBuilder' /tmp/ptasie-src/lib/main.dart | head -n 260 || true
+          echo '=== CONTEXT AROUND STARTUP MATCHES ==='
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('/tmp/ptasie-src/lib/main.dart')
+          lines = p.read_text(encoding='utf-8').splitlines()
+          needles = ['void main', 'class PtasiaApp', 'supabaseReady', 'currentTab', 'bottomNavigationBar', 'NavigationBar(', 'Widget build(BuildContext context)']
+          seen = set()
+          for needle in needles:
+              for i, line in enumerate(lines):
+                  if needle in line:
+                      a=max(0,i-35); b=min(len(lines),i+75)
+                      key=(a,b)
+                      if key in seen: continue
+                      seen.add(key)
+                      print(f'--- {needle} @ {i+1}, lines {a+1}-{b} ---')
+                      for j in range(a,b): print(f'{j+1:05d}: {lines[j]}')
+                      break
+          PY
