@@ -16,12 +16,10 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Sprawdź dokładnie HomePage
+      - name: Sprawdź BirdObservationsPage
         shell: bash
         run: |
           set -euo pipefail
           unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          echo '===== HomePage 3740-3915 ====='
-          nl -ba /tmp/main.dart | sed -n '3740,3915p'
-          echo '===== okolice kolejnych ekranów 3915-4070 ====='
-          nl -ba /tmp/main.dart | sed -n '3915,4070p'
+          echo '===== BirdObservationsPage 4350-4625 ====='
+          nl -ba /tmp/main.dart | sed -n '4350,4625p'
