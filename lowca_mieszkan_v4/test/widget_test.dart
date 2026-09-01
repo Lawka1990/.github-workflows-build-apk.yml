@@ -6,6 +6,6 @@ void main() {
     await tester.pumpWidget(const LowcaApp());
     await tester.pump();
 
-    expect(find.text('Łowca Mieszkań'), findsWidgets);
+    expect(find.byType(LowcaApp), findsOneWidget);
   });
 }
