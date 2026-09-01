@@ -1,4 +1,4 @@
-name: Build Lowca Mieszkan v2
+name: Build Lowca Mieszkan v2.0.1
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - ".github/workflows/build-lowca-mieszkan-v2-fixed.yml"
+      - ".github/workflows/patch-lowca-mieszkan-click.py"
 
 permissions:
   contents: read
@@ -55,6 +56,9 @@ jobs:
               dest.write_bytes(zlib.decompress(base64.b64decode(m.group(1))))
               print('created', dest, dest.stat().st_size, 'bytes')
           PY
+
+      - name: Patch search buttons
+        run: python3 .github/workflows/patch-lowca-mieszkan-click.py
 
       - name: Generate Android project
         working-directory: lowca_mieszkan_build
@@ -108,16 +112,16 @@ jobs:
       - name: Collect artifacts
         run: |
           mkdir -p lowca_mieszkan_artifacts
-          cp lowca_mieszkan_build/build/app/outputs/flutter-apk/app-release.apk lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0.apk
-          cp lowca_mieszkan_build/build/app/outputs/bundle/release/app-release.aab lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0.aab
+          cp lowca_mieszkan_build/build/app/outputs/flutter-apk/app-release.apk lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.1.apk
+          cp lowca_mieszkan_build/build/app/outputs/bundle/release/app-release.aab lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.1.aab
           cd lowca_mieszkan_build
-          zip -rq ../lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.0-source.zip . -x '.dart_tool/*' 'build/*'
+          zip -rq ../lowca_mieszkan_artifacts/Lowca-Mieszkan-v2.0.1-source.zip . -x '.dart_tool/*' 'build/*'
           cd ..
           ls -lah lowca_mieszkan_artifacts
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: lowca-mieszkan-v2
+          name: lowca-mieszkan-v2.0.1
           path: lowca_mieszkan_artifacts/*
           if-no-files-found: error
