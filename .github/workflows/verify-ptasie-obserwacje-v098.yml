@@ -1,0 +1,180 @@
+name: Weryfikuj Ptasie Obserwacje v0.9.8
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/verify-ptasie-obserwacje-v098.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Przygotuj źródła
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app
+          mkdir app
+          unzip -q PTASIE_OBSERWACJE_v093.zip -d app
+          sed -i 's/^version: .*/version: 0.9.8+105/' app/pubspec.yaml
+          python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/lib/main.dart')
+          s = p.read_text(encoding='utf-8')
+          old = "      );\n      supabaseReady = true;"
+          new = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
+          if old not in s:
+              raise SystemExit('Brak miejsca do poprawy Supabase')
+          s = s.replace(old, new, 1)
+          old_nav = "      bottomNavigationBar: SafeArea(\n        top: false,\n        minimum: const EdgeInsets.only(bottom: 10),\n        child: Padding(\n          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n          child: NavigationBar(\n            height: 72,\n            selectedIndex: min(state.currentTab, items.length - 1),\n            onDestinationSelected: state.setTab,\n            destinations: items,\n          ),\n        ),\n      ),"
+          new_nav = "      bottomNavigationBar: items.length < 2\n          ? null\n          : SafeArea(\n              top: false,\n              minimum: const EdgeInsets.only(bottom: 10),\n              child: Padding(\n                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n                child: NavigationBar(\n                  height: 72,\n                  selectedIndex: min(state.currentTab, items.length - 1),\n                  onDestinationSelected: state.setTab,\n                  destinations: items,\n                ),\n              ),\n            ),"
+          if old_nav not in s:
+              raise SystemExit('Brak paska nawigacji do poprawy')
+          s = s.replace(old_nav, new_nav, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Wygeneruj Android i zastosuj patche
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          flutter create --platforms android --org pl.bartoszlawicki .
+          python3 tool/patch_android_variant.py
+          if [ -f tool/patch_android_native_file_picker.py ]; then python3 tool/patch_android_native_file_picker.py; fi
+          if [ -f tool/patch_android_manifest.py ]; then python3 tool/patch_android_manifest.py || true; fi
+          if [ -f tool/patch_android_manifest_auth.py ]; then python3 tool/patch_android_manifest_auth.py || true; fi
+          if [ -f tool/patch_android_compile_sdk.py ]; then python3 tool/patch_android_compile_sdk.py || true; fi
+          flutter pub get
+          grep -Fq 'bottomNavigationBar: items.length < 2' lib/main.dart
+          grep -Fq ').timeout(const Duration(seconds: 5));' lib/main.dart
+
+      - name: Zbuduj APK
+        working-directory: app
+        env:
+          SUPABASE_URL: https://ksskwqcbnultkwxjsgor.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_h7hTCQnCsGGN_MWswivJAA_ILjb3p6M
+          SUPABASE_OAUTH_REDIRECT_TO: ${{ secrets.SUPABASE_OAUTH_REDIRECT_TO }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
+            --dart-define=APP_VERSION_NAME="0.9.8" \
+            --dart-define=APP_VERSION_CODE="105"
+
+      - name: Podpisz APK
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64_PART_1: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_1 }}
+          ANDROID_KEYSTORE_BASE64_PART_2: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_2 }}
+          ANDROID_KEYSTORE_BASE64_PART_3: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_3 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}" ]; then
+            RAW="$(printf '%s%s%s' "$ANDROID_KEYSTORE_BASE64_PART_1" "$ANDROID_KEYSTORE_BASE64_PART_2" "$ANDROID_KEYSTORE_BASE64_PART_3" | tr -d '[:space:]')"
+            RAW="${RAW//ANDROID_KEYSTORE_BASE64_PART_1=/}"
+            RAW="${RAW//ANDROID_KEYSTORE_BASE64_PART_2=/}"
+            RAW="${RAW//ANDROID_KEYSTORE_BASE64_PART_3=/}"
+          else
+            RAW="${ANDROID_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
+          fi
+          printf '%s' "$RAW" | tr -d '[:space:]' | base64 --decode > upload-keystore.jks
+          export SIGNING_STORE_PASSWORD="${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}"
+          export SIGNING_KEY_ALIAS="${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}"
+          export SIGNING_KEY_PASSWORD="${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          mkdir -p release
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v098-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign --ks upload-keystore.jks --ks-key-alias "$SIGNING_KEY_ALIAS" --ks-pass "env:SIGNING_STORE_PASSWORD" --key-pass "env:SIGNING_KEY_PASSWORD" --out release/ptasie-obserwacje-v098.apk release/ptasie-obserwacje-v098-aligned.apk
+          rm release/ptasie-obserwacje-v098-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v098.apk
+          "$BUILD_TOOLS/aapt" dump badging release/ptasie-obserwacje-v098.apk | tee /tmp/badging.txt
+          grep -q "package: name='pl.bartoszlawicki.ptasie_obserwacje'" /tmp/badging.txt
+          grep -q "versionName='0.9.8'" /tmp/badging.txt
+          sha256sum release/ptasie-obserwacje-v098.apk > release/ptasie-obserwacje-v098.apk.sha256
+
+      - name: Włącz KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+
+      - name: Sprawdź na emulatorze Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: "-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim"
+          script: |
+            set -eu
+            python3 -m pip install --quiet pillow
+            adb install -r release/ptasie-obserwacje-v098.apk
+            adb logcat -c
+            adb shell am force-stop pl.bartoszlawicki.ptasie_obserwacje
+            adb shell monkey -p pl.bartoszlawicki.ptasie_obserwacje -c android.intent.category.LAUNCHER 1
+            sleep 12
+            PID="$(adb shell pidof pl.bartoszlawicki.ptasie_obserwacje | tr -d '\r')"
+            echo "PID=$PID"
+            test -n "$PID"
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' > /tmp/ptasie-focus.txt || true
+            cat /tmp/ptasie-focus.txt
+            grep -q 'pl.bartoszlawicki.ptasie_obserwacje' /tmp/ptasie-focus.txt
+            adb logcat -d --pid="$PID" > /tmp/ptasie-logcat.txt || adb logcat -d > /tmp/ptasie-logcat.txt
+            if grep -Ei 'FATAL EXCEPTION|AndroidRuntime.*FATAL|E/flutter.*Unhandled Exception' /tmp/ptasie-logcat.txt; then exit 1; fi
+            adb exec-out screencap -p > /tmp/ptasie-first-screen.png
+            python3 - <<'PY'
+            from PIL import Image, ImageStat
+            img = Image.open('/tmp/ptasie-first-screen.png').convert('RGB')
+            w,h = img.size
+            crop = img.crop((0,int(h*.06),w,int(h*.94)))
+            px = list(crop.getdata())
+            near_black = sum(1 for r,g,b in px if r<18 and g<18 and b<18)/len(px)
+            mean = sum((r+g+b)/3 for r,g,b in px)/len(px)
+            std = ImageStat.Stat(crop).stddev
+            unique = len(set(crop.resize((max(1,crop.width//10),max(1,crop.height//10))).getdata()))
+            print(f'near_black={near_black:.4f} mean={mean:.2f} std={std} unique={unique}')
+            assert near_black < .90
+            assert mean > 15
+            assert max(std) > 4
+            assert unique > 20
+            PY
+
+      - name: Zapisz gotowy APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v098-GOTOWE
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
