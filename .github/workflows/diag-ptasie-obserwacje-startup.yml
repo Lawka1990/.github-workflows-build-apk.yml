@@ -14,23 +14,20 @@ jobs:
   inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Pobierz repozytorium
-        uses: actions/checkout@v4
-
-      - name: Pokaż kod AppState i ścieżkę startową
+      - uses: actions/checkout@v4
+      - name: Pokaż ryzykowne fragmenty startu
         shell: bash
         run: |
           set -euo pipefail
-          rm -rf /tmp/ptasie-src
-          mkdir -p /tmp/ptasie-src
+          rm -rf /tmp/ptasie-src && mkdir -p /tmp/ptasie-src
           unzip -q PTASIE_OBSERWACJE_v093.zip -d /tmp/ptasie-src
-          echo '=== KLASY I INIT ==='
-          grep -nE '^class AppState|Future<.*init\(|void init\(|init\(\)|supabaseReady|Supabase\.instance|_load|load[A-Z]|restore|SharedPreferences|getInstance' /tmp/ptasie-src/lib/main.dart | head -n 400 || true
-          echo '=== POCZATEK APPSTATE ==='
-          START=$(grep -n '^class AppState' /tmp/ptasie-src/lib/main.dart | head -n1 | cut -d: -f1 || true)
-          if [ -n "$START" ]; then
-            END=$((START+950))
-            sed -n "${START},${END}p" /tmp/ptasie-src/lib/main.dart
-          fi
-          echo '=== MAIN 70-180 ==='
-          sed -n '70,180p' /tmp/ptasie-src/lib/main.dart
+          F=/tmp/ptasie-src/lib/main.dart
+          echo '=== CHECK FOR UPDATES MATCHES ==='
+          grep -nE 'checkForUpdates|appUpdateJsonUrl|appUpdateApkUrl|UpdateInfo|http\.|Uri\.parse|launchUrl' "$F" | head -n 240 || true
+          echo '=== CONTEXT CHECK FOR UPDATES ==='
+          L=$(grep -n 'checkForUpdates' "$F" | tail -n1 | cut -d: -f1 || true)
+          if [ -n "$L" ]; then A=$((L-90)); [ $A -lt 1 ] && A=1; B=$((L+210)); sed -n "${A},${B}p" "$F"; fi
+          echo '=== HOMEPAGE AND OBSERVATIONS WIDGETS ==='
+          grep -nE '^class HomePage|^class .*Observation|initState\(|dispose\(|Widget build\(BuildContext context\)|NavigationBar\(' "$F" | tail -n 260 || true
+          H=$(grep -n '^class HomePage' "$F" | head -n1 | cut -d: -f1 || true)
+          if [ -n "$H" ]; then E=$((H+430)); sed -n "${H},${E}p" "$F"; fi
