@@ -1,0 +1,69 @@
+name: Runtime test Ptasie Obserwacje v0.9.8
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/runtime-verify-ptasie-v098.yml"
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  runtime-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pobierz dokładnie podpisany APK z poprzedniej kompilacji
+        uses: actions/download-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v098-PODPISANE
+          path: release
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 33495327983
+
+      - name: Sprawdź integralność APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh release
+          cd release
+          sha256sum -c ptasie-obserwacje-v098.apk.sha256
+
+      - name: Włącz KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+
+      - name: Uruchom podpisany APK na Androidzie i zweryfikuj ekran
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: "-no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim"
+          script: bash .github/scripts/verify_ptasie_android.sh release/ptasie-obserwacje-v098.apk
+
+      - name: Zachowaj dowody testu
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v098-RUNTIME-TEST
+          path: |
+            /tmp/ptasie-am-start.txt
+            /tmp/ptasie-focus.txt
+            /tmp/ptasie-first-screen.png
+            /tmp/ptasie-window.xml
+            /tmp/ptasie-screen-metrics.txt
+            /tmp/ptasie-logcat-app.txt
+          if-no-files-found: ignore
+          retention-days: 30
