@@ -16,10 +16,9 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Sprawdź właściwy ekran obserwacji
+      - name: Znajdź klasę ekranu obserwacji
         shell: bash
         run: |
           set -euo pipefail
           unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          echo '===== linie 4770-5100 ====='
-          nl -ba /tmp/main.dart | sed -n '4770,5100p'
+          grep -n -E 'class .*Bird.*Observation|BirdObservationsPage|BirdObservation' /tmp/main.dart | head -n 120
