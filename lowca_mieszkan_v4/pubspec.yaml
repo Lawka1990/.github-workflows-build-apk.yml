@@ -1,0 +1,25 @@
+name: lowca_mieszkan_android
+version: 4.0.0+40
+description: Łowca Mieszkań V4 - wyszukiwarka mieszkań własnościowych i lokalny organizer ofert.
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/apartment1.png
+    - assets/images/apartment2.png
+    - assets/images/apartment3.png
