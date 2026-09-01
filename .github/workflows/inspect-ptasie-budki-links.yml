@@ -1,0 +1,23 @@
+name: Inspect Ptasie Budki links
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/inspect-ptasie-budki-links.yml"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sprawdz linki i menu
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app && mkdir app
+          unzip -q PTASIE_BUDKI_v093.zip -d app
+          echo '--- URLS / STREFA / YOUTUBE ---'
+          grep -RniE -C 4 'https?://|youtube|strefa|launchUrl|url_launcher' app/lib app/pubspec.yaml || true
+          echo '--- APPBAR / MENU / DRAWER ---'
+          grep -RniE -C 6 'AppBar|PopupMenu|Drawer|IconButton|NavigationBar|showModalBottomSheet|MenuAnchor' app/lib/main.dart | head -n 500 || true
