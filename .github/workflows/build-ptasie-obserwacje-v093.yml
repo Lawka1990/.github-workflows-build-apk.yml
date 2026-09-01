@@ -1,4 +1,4 @@
-name: Buduj Ptasie Obserwacje v0.9.7
+name: Buduj Ptasie Obserwacje v0.9.8
 
 on:
   workflow_dispatch:
@@ -15,6 +15,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Pobierz repozytorium
@@ -39,6 +40,22 @@ jobs:
           mkdir app
           unzip -q "PTASIE_OBSERWACJE_v093.zip" -d app
 
+      - name: Ustaw wersję 0.9.8
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('pubspec.yaml')
+          s = p.read_text(encoding='utf-8')
+          import re
+          s, count = re.subn(r'^version:\s*.*$', 'version: 0.9.8+105', s, count=1, flags=re.MULTILINE)
+          if count != 1:
+              raise SystemExit('Nie znaleziono pola version w pubspec.yaml')
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Usuń opis wersji spod mapy
         run: python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
 
@@ -51,16 +68,175 @@ jobs:
           from pathlib import Path
           p = Path('lib/main.dart')
           s = p.read_text(encoding='utf-8')
-          old_supabase = "      );\n      supabaseReady = true;"
-          new_supabase = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
-          if old_supabase not in s:
-              raise SystemExit('Nie znaleziono inicjalizacji Supabase')
-          s = s.replace(old_supabase, new_supabase, 1)
-          old_nav = "      bottomNavigationBar: SafeArea(\n        top: false,\n        minimum: const EdgeInsets.only(bottom: 10),\n        child: Padding(\n          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n          child: NavigationBar(\n            height: 72,\n            selectedIndex: min(state.currentTab, items.length - 1),\n            onDestinationSelected: state.setTab,\n            destinations: items,\n          ),\n        ),\n      ),"
-          new_nav = "      bottomNavigationBar: items.length < 2\n          ? null\n          : SafeArea(\n              top: false,\n              minimum: const EdgeInsets.only(bottom: 10),\n              child: Padding(\n                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n                child: NavigationBar(\n                  height: 72,\n                  selectedIndex: min(state.currentTab, items.length - 1),\n                  onDestinationSelected: state.setTab,\n                  destinations: items,\n                ),\n              ),\n            ),"
+
+          old_main = '''Future<void> main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+
+            bool supabaseReady = false;
+            final cleanUrl = _normalizeSupabaseUrl(supabaseUrl);
+
+            if (cleanUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+              try {
+                await Supabase.initialize(
+                  url: cleanUrl,
+                  anonKey: supabaseAnonKey,
+                  authOptions: const FlutterAuthClientOptions(
+                    // W tej aplikacji zostawiamy implicit, bo jest prostszy i bardziej
+                    // odporny przy deep linkach na Androidzie: Google login, potwierdzenie
+                    // emaila i reset hasła wracają tym samym callbackiem do aplikacji.
+                    authFlowType: AuthFlowType.implicit,
+                  ),
+                );
+                supabaseReady = true;
+              } catch (_) {
+                supabaseReady = false;
+              }
+            }
+
+            runApp(PtasiaApp(supabaseReady: supabaseReady));
+          }
+          '''
+          new_main = '''Future<void> main() async {
+            WidgetsFlutterBinding.ensureInitialized();
+
+            // Pierwsza klatka ma pojawić się natychmiast. Dzięki temu nawet wolna
+            // inicjalizacja sieci/Supabase nie zostawia użytkownika na czarnym ekranie.
+            runApp(const _PtasiaStartupApp());
+
+            bool supabaseReady = false;
+            final cleanUrl = _normalizeSupabaseUrl(supabaseUrl);
+
+            if (cleanUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
+              try {
+                await Supabase.initialize(
+                  url: cleanUrl,
+                  anonKey: supabaseAnonKey,
+                  authOptions: const FlutterAuthClientOptions(
+                    authFlowType: AuthFlowType.implicit,
+                  ),
+                ).timeout(const Duration(seconds: 5));
+                supabaseReady = true;
+              } catch (_) {
+                supabaseReady = false;
+              }
+            }
+
+            runApp(PtasiaApp(supabaseReady: supabaseReady));
+          }
+
+          class _PtasiaStartupApp extends StatelessWidget {
+            const _PtasiaStartupApp();
+
+            @override
+            Widget build(BuildContext context) {
+              return MaterialApp(
+                debugShowCheckedModeBanner: false,
+                theme: AppTheme.theme,
+                home: const Scaffold(
+                  body: SafeArea(
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.flutter_dash, size: 58, color: AppTheme.green),
+                          SizedBox(height: 18),
+                          Text(
+                            'Ptasie Obserwacje',
+                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                          ),
+                          SizedBox(height: 18),
+                          SizedBox(
+                            width: 28,
+                            height: 28,
+                            child: CircularProgressIndicator(strokeWidth: 3),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+          '''
+          if old_main not in s:
+              raise SystemExit('Nie znaleziono oczekiwanego main() do poprawy')
+          s = s.replace(old_main, new_main, 1)
+
+          old_nav = '''      bottomNavigationBar: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                  child: NavigationBar(
+                    height: 72,
+                    selectedIndex: min(state.currentTab, items.length - 1),
+                    onDestinationSelected: state.setTab,
+                    destinations: items,
+                  ),
+                ),
+              ),'''
           if old_nav not in s:
+              old_nav = '''      bottomNavigationBar: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                  child: NavigationBar(
+                    height: 72,
+                    selectedIndex: min(state.currentTab, items.length - 1),
+                    onDestinationSelected: state.setTab,
+                    destinations: items,
+                  ),
+                ),
+              ),'''
+
+          raw_nav = '''      bottomNavigationBar: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.only(bottom: 10),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                  child: NavigationBar(
+                    height: 72,
+                    selectedIndex: min(state.currentTab, items.length - 1),
+                    onDestinationSelected: state.setTab,
+                    destinations: items,
+                  ),
+                ),
+              ),'''
+          # Źródłowy plik ma 6 spacji mniej niż tekst powyżej; prostszy i odporny
+          # patch robimy na dokładnym fragmencie bez polegania na klasie nadrzędnej.
+          source_nav = '''      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+          child: NavigationBar(
+            height: 72,
+            selectedIndex: min(state.currentTab, items.length - 1),
+            onDestinationSelected: state.setTab,
+            destinations: items,
+          ),
+        ),
+      ),'''
+          fixed_nav = '''      bottomNavigationBar: items.length < 2
+          ? null
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                child: NavigationBar(
+                  height: 72,
+                  selectedIndex: min(state.currentTab, items.length - 1),
+                  onDestinationSelected: state.setTab,
+                  destinations: items,
+                ),
+              ),
+            ),'''
+          if source_nav not in s:
               raise SystemExit('Nie znaleziono dolnego paska nawigacji')
-          s = s.replace(old_nav, new_nav, 1)
+          s = s.replace(source_nav, fixed_nav, 1)
           p.write_text(s, encoding='utf-8')
           PY
 
@@ -84,6 +260,7 @@ jobs:
         run: flutter pub get
 
       - name: Sprawdź pierwszy ekran aplikacji
+        id: widget_test
         working-directory: app
         shell: bash
         run: |
@@ -100,18 +277,21 @@ jobs:
               await tester.pumpWidget(const PtasiaApp(supabaseReady: false));
               await tester.pump();
               expect(find.text('Ptasie Obserwacje'), findsWidgets);
+              expect(find.text('Obserwacje'), findsWidgets);
               expect(tester.takeException(), isNull);
             });
           }
           DART
-          flutter test test/startup_test.dart -r expanded
+          flutter test test/startup_test.dart -r expanded 2>&1 | tee /tmp/ptasie-widget-test.log
 
       - name: Zbuduj APK
+        id: build_apk
         working-directory: app
         env:
           SUPABASE_URL: https://ksskwqcbnultkwxjsgor.supabase.co
           SUPABASE_ANON_KEY: sb_publishable_h7hTCQnCsGGN_MWswivJAA_ILjb3p6M
           SUPABASE_OAUTH_REDIRECT_TO: ${{ secrets.SUPABASE_OAUTH_REDIRECT_TO }}
+        shell: bash
         run: |
           set -euo pipefail
           test -n "$SUPABASE_URL"
@@ -121,10 +301,11 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
-            --dart-define=APP_VERSION_NAME="0.9.7" \
-            --dart-define=APP_VERSION_CODE="104"
+            --dart-define=APP_VERSION_NAME="0.9.8" \
+            --dart-define=APP_VERSION_CODE="105" 2>&1 | tee /tmp/ptasie-build.log
 
       - name: Przygotuj stały klucz podpisu
+        id: prepare_signing
         shell: bash
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -155,36 +336,154 @@ jobs:
           printf 'SIGNING_KEY_PASSWORD=%s\n' "${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}" >> "$GITHUB_ENV"
 
       - name: Podpisz i sprawdź APK
+        id: sign_apk
         shell: bash
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/ptasie-sign.log) 2>&1
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           mkdir -p release
-          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v097-aligned.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v098-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks upload-keystore.jks \
             --ks-key-alias "$SIGNING_KEY_ALIAS" \
             --ks-pass "env:SIGNING_STORE_PASSWORD" \
             --key-pass "env:SIGNING_KEY_PASSWORD" \
-            --out release/ptasie-obserwacje-v097.apk \
-            release/ptasie-obserwacje-v097-aligned.apk
-          rm release/ptasie-obserwacje-v097-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v097.apk
-          sha256sum release/ptasie-obserwacje-v097.apk > release/ptasie-obserwacje-v097.apk.sha256
+            --out release/ptasie-obserwacje-v098.apk \
+            release/ptasie-obserwacje-v098-aligned.apk
+          rm release/ptasie-obserwacje-v098-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v098.apk
+          "$BUILD_TOOLS/aapt" dump badging release/ptasie-obserwacje-v098.apk | tee /tmp/ptasie-badging.txt
+          grep -q "package: name='pl.bartoszlawicki.ptasie_obserwacje'" /tmp/ptasie-badging.txt
+          grep -q "versionName='0.9.8'" /tmp/ptasie-badging.txt
+          sha256sum release/ptasie-obserwacje-v098.apk > release/ptasie-obserwacje-v098.apk.sha256
+
+      - name: Włącz KVM dla emulatora
+        id: kvm
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm || true
+          ls -l /dev/kvm || true
+
+      - name: Uruchom i sprawdź APK na prawdziwym emulatorze Android
+        id: emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: |
+            set -euo pipefail
+            exec > >(tee /tmp/ptasie-emulator.log) 2>&1
+            python3 -m pip install --quiet pillow
+            adb install -r release/ptasie-obserwacje-v098.apk
+            adb logcat -c
+            adb shell am force-stop pl.bartoszlawicki.ptasie_obserwacje
+            adb shell monkey -p pl.bartoszlawicki.ptasie_obserwacje -c android.intent.category.LAUNCHER 1
+            sleep 12
+            PID="$(adb shell pidof pl.bartoszlawicki.ptasie_obserwacje | tr -d '\r')"
+            echo "PID=$PID"
+            test -n "$PID"
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | tee /tmp/ptasie-focus.txt || true
+            adb logcat -d --pid="$PID" > /tmp/ptasie-logcat.txt || adb logcat -d > /tmp/ptasie-logcat.txt
+            if grep -Ei 'FATAL EXCEPTION|AndroidRuntime.*FATAL|E/flutter.*Unhandled Exception|Dart Error' /tmp/ptasie-logcat.txt; then
+              echo 'Wykryto błąd krytyczny aplikacji w logcat.'
+              exit 1
+            fi
+            adb exec-out screencap -p > /tmp/ptasie-first-screen.png
+            python3 - <<'PY'
+            from PIL import Image, ImageStat
+            img = Image.open('/tmp/ptasie-first-screen.png').convert('RGB')
+            w, h = img.size
+            crop = img.crop((0, int(h * 0.06), w, int(h * 0.94)))
+            pixels = list(crop.getdata())
+            near_black = sum(1 for r, g, b in pixels if r < 18 and g < 18 and b < 18) / len(pixels)
+            mean = sum((r + g + b) / 3 for r, g, b in pixels) / len(pixels)
+            std = ImageStat.Stat(crop).stddev
+            small = crop.resize((max(1, crop.width // 10), max(1, crop.height // 10)))
+            unique = len(set(small.getdata()))
+            report = f'near_black={near_black:.4f}\nmean_luma={mean:.2f}\nstddev={std}\nunique_colors_sample={unique}\n'
+            print(report, end='')
+            open('/tmp/ptasie-screen-metrics.txt', 'w', encoding='utf-8').write(report)
+            assert near_black < 0.95, 'Pierwszy ekran jest prawie cały czarny'
+            assert mean > 10, 'Pierwszy ekran ma zbyt niską jasność'
+            assert max(std) > 4, 'Pierwszy ekran jest niemal jednolity'
+            assert unique > 20, 'Pierwszy ekran ma za mało zróżnicowanej treści'
+            PY
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml /tmp/ptasie-window.xml || true
+            echo 'Emulator: aplikacja działa, proces żyje, brak błędów krytycznych, ekran nie jest czarny.'
 
       - name: Zapisz APK
+        id: upload_apk
         uses: actions/upload-artifact@v4
         with:
-          name: Ptasie-Obserwacje-v097
+          name: Ptasie-Obserwacje-v098
           path: release/*
           if-no-files-found: error
           retention-days: 90
 
+      - name: Zapisz diagnostykę emulatora
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v098-emulator-diagnostics
+          path: |
+            /tmp/ptasie-first-screen.png
+            /tmp/ptasie-screen-metrics.txt
+            /tmp/ptasie-focus.txt
+            /tmp/ptasie-logcat.txt
+            /tmp/ptasie-emulator.log
+            /tmp/ptasie-widget-test.log
+            /tmp/ptasie-build.log
+            /tmp/ptasie-sign.log
+            /tmp/ptasie-badging.txt
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Utwórz wydanie
+        id: release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ptasie_obserwacje-v0.9.7
-          name: Ptasie Obserwacje v0.9.7
+          tag_name: ptasie_obserwacje-v0.9.8
+          name: Ptasie Obserwacje v0.9.8
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zapisz raport weryfikacji w repozytorium
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .github/verification
+          {
+            echo "version=0.9.8"
+            echo "source_commit=$GITHUB_SHA"
+            echo "widget_test=${{ steps.widget_test.outcome }}"
+            echo "build_apk=${{ steps.build_apk.outcome }}"
+            echo "prepare_signing=${{ steps.prepare_signing.outcome }}"
+            echo "sign_apk=${{ steps.sign_apk.outcome }}"
+            echo "kvm=${{ steps.kvm.outcome }}"
+            echo "emulator=${{ steps.emulator.outcome }}"
+            echo "upload_apk=${{ steps.upload_apk.outcome }}"
+            echo "release=${{ steps.release.outcome }}"
+            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            if [ -f /tmp/ptasie-screen-metrics.txt ]; then
+              cat /tmp/ptasie-screen-metrics.txt
+            fi
+            if [ -f release/ptasie-obserwacje-v098.apk.sha256 ]; then
+              cat release/ptasie-obserwacje-v098.apk.sha256
+            fi
+          } > .github/verification/ptasie-v098.txt
+          cat .github/verification/ptasie-v098.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/verification/ptasie-v098.txt
+          git commit -m "verification: Ptasie Obserwacje v0.9.8 [skip ci]" || exit 0
+          git push
