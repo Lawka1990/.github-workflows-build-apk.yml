@@ -1,4 +1,4 @@
-name: Buduj Ptasie Obserwacje v0.9.5
+name: Buduj Ptasie Obserwacje v0.9.6
 
 on:
   workflow_dispatch:
@@ -38,7 +38,7 @@ jobs:
           mkdir app
           unzip -q "PTASIE_OBSERWACJE_v093.zip" -d app
 
-      - name: Napraw zawieszanie na ekranie startowym
+      - name: Napraw start i nawigację Ptasich Obserwacji
         working-directory: app
         shell: bash
         run: |
@@ -47,11 +47,45 @@ jobs:
           from pathlib import Path
           p = Path('lib/main.dart')
           s = p.read_text(encoding='utf-8')
-          old = "      );\n      supabaseReady = true;"
-          new = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
-          if old not in s:
-              raise SystemExit('Nie znaleziono miejsca do dodania timeoutu Supabase')
-          s = s.replace(old, new, 1)
+
+          old_supabase = "      );\n      supabaseReady = true;"
+          new_supabase = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
+          if old_supabase not in s:
+              raise SystemExit('Nie znaleziono inicjalizacji Supabase')
+          s = s.replace(old_supabase, new_supabase, 1)
+
+          old_nav = """      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.only(bottom: 10),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+          child: NavigationBar(
+            height: 72,
+            selectedIndex: min(state.currentTab, items.length - 1),
+            onDestinationSelected: state.setTab,
+            destinations: items,
+          ),
+        ),
+      ),"""
+          new_nav = """      bottomNavigationBar: items.length < 2
+          ? null
+          : SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 10),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                child: NavigationBar(
+                  height: 72,
+                  selectedIndex: min(state.currentTab, items.length - 1),
+                  onDestinationSelected: state.setTab,
+                  destinations: items,
+                ),
+              ),
+            ),"""
+          if old_nav not in s:
+              raise SystemExit('Nie znaleziono dolnego paska nawigacji')
+          s = s.replace(old_nav, new_nav, 1)
+
           p.write_text(s, encoding='utf-8')
           PY
 
@@ -74,6 +108,29 @@ jobs:
         working-directory: app
         run: flutter pub get
 
+      - name: Sprawdź pierwszy ekran aplikacji
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p test
+          cat > test/startup_test.dart <<'DART'
+          import 'package:flutter_test/flutter_test.dart';
+          import 'package:shared_preferences/shared_preferences.dart';
+          import 'package:ptasie_obserwacje/main.dart';
+
+          void main() {
+            testWidgets('pierwszy ekran renderuje się poprawnie', (tester) async {
+              SharedPreferences.setMockInitialValues({});
+              await tester.pumpWidget(const PtasiaApp(supabaseReady: false));
+              await tester.pump();
+              expect(find.text('Ptasie Obserwacje'), findsWidgets);
+              expect(tester.takeException(), isNull);
+            });
+          }
+          DART
+          flutter test test/startup_test.dart -r expanded
+
       - name: Zbuduj APK
         working-directory: app
         env:
@@ -89,8 +146,8 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}" \
-            --dart-define=APP_VERSION_NAME="0.9.5" \
-            --dart-define=APP_VERSION_CODE="102"
+            --dart-define=APP_VERSION_NAME="0.9.6" \
+            --dart-define=APP_VERSION_CODE="103"
 
       - name: Przygotuj stały klucz podpisu
         shell: bash
@@ -128,22 +185,22 @@ jobs:
           set -euo pipefail
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           mkdir -p release
-          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v095-aligned.apk
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v096-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks upload-keystore.jks \
             --ks-key-alias "$SIGNING_KEY_ALIAS" \
             --ks-pass "env:SIGNING_STORE_PASSWORD" \
             --key-pass "env:SIGNING_KEY_PASSWORD" \
-            --out release/ptasie-obserwacje-v095.apk \
-            release/ptasie-obserwacje-v095-aligned.apk
-          rm release/ptasie-obserwacje-v095-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v095.apk
-          sha256sum release/ptasie-obserwacje-v095.apk > release/ptasie-obserwacje-v095.apk.sha256
+            --out release/ptasie-obserwacje-v096.apk \
+            release/ptasie-obserwacje-v096-aligned.apk
+          rm release/ptasie-obserwacje-v096-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v096.apk
+          sha256sum release/ptasie-obserwacje-v096.apk > release/ptasie-obserwacje-v096.apk.sha256
 
       - name: Zapisz APK
         uses: actions/upload-artifact@v4
         with:
-          name: Ptasie-Obserwacje-v095
+          name: Ptasie-Obserwacje-v096
           path: release/*
           if-no-files-found: error
           retention-days: 90
@@ -151,8 +208,8 @@ jobs:
       - name: Utwórz wydanie
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ptasie_obserwacje-v0.9.5
-          name: Ptasie Obserwacje v0.9.5
+          tag_name: ptasie_obserwacje-v0.9.6
+          name: Ptasie Obserwacje v0.9.6
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
