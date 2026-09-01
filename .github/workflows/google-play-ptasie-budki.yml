@@ -41,6 +41,7 @@ jobs:
           unzip -q PTASIE_BUDKI_v093.zip -d app
           sed -i 's/^version: .*/version: 0.9.6+102/' app/pubspec.yaml
           python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
+          python3 .github/scripts/add_ptasia_strefa_shortcuts.py app/lib/main.dart
 
       - name: Wygeneruj Android i ustaw API 36
         working-directory: app
