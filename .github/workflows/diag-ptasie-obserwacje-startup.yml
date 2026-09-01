@@ -16,14 +16,12 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Sprawdź AppState i ekran główny
+      - name: Sprawdź dokładnie HomePage
         shell: bash
         run: |
           set -euo pipefail
           unzip -p PTASIE_OBSERWACJE_v093.zip lib/main.dart > /tmp/main.dart
-          echo '===== klasy / init / HomePage ====='
-          nl -ba /tmp/main.dart | grep -E 'class AppState|class HomePage|Future<void> init|void initState|Widget build|Scaffold|FutureBuilder|StreamBuilder' | head -n 160 || true
-          echo '===== linie 300-900 ====='
-          nl -ba /tmp/main.dart | sed -n '300,900p'
-          echo '===== linie 900-1500 ====='
-          nl -ba /tmp/main.dart | sed -n '900,1500p'
+          echo '===== HomePage 3740-3915 ====='
+          nl -ba /tmp/main.dart | sed -n '3740,3915p'
+          echo '===== okolice kolejnych ekranów 3915-4070 ====='
+          nl -ba /tmp/main.dart | sed -n '3915,4070p'
