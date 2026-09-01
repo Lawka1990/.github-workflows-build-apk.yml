@@ -1,0 +1,137 @@
+name: Zbuduj Grunwald 2026 V12
+
+on:
+  push:
+    paths:
+      - "GRUNWALD_2026_V12.zip"
+      - ".github/workflows/rozpakuj-zip-i-zbuduj-v12.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: grunwald-v12-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Znajdź ZIP V12
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="$(find . -maxdepth 2 -type f -iname 'GRUNWALD_2026_V12.zip' -print -quit)"
+          if [[ -z "$ZIP_FILE" ]]; then
+            echo "Brak pliku GRUNWALD_2026_V12.zip."
+            exit 1
+          fi
+          echo "path=${ZIP_FILE#./}" >> "$GITHUB_OUTPUT"
+
+      - name: Rozpakuj do czystego katalogu
+        id: project
+        shell: bash
+        env:
+          ZIP_FILE: ${{ steps.archive.outputs.path }}
+        run: |
+          set -euo pipefail
+          PROJECT_DIR="$RUNNER_TEMP/grunwald-v12"
+          rm -rf "$PROJECT_DIR"
+          mkdir -p "$PROJECT_DIR"
+          unzip -oq "$ZIP_FILE" -d "$PROJECT_DIR"
+          if [[ ! -f "$PROJECT_DIR/pubspec.yaml" ]]; then
+            ROOT="$(find "$PROJECT_DIR" -mindepth 1 -maxdepth 2 -type f -name pubspec.yaml -printf '%h\n' | head -n 1)"
+            test -n "$ROOT"
+            echo "dir=$ROOT" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ustaw Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Ustaw Flutter 3.44.1
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.1"
+          channel: stable
+          cache: true
+
+      - name: Kontrola danych i plików V12
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: python3 tool/audit_project.py
+
+      - name: Pobierz zależności
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: flutter pub get
+
+      - name: Utwórz czystą platformę Android
+        working-directory: ${{ steps.project.outputs.dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .platform_template android
+          flutter create --platforms=android --org pl.grunwald --project-name grunwald_navigator .platform_template
+          cp -R .platform_template/android ./android
+          rm -rf .platform_template
+
+      - name: Skonfiguruj Androida
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: python3 tool/patch_android.py
+
+      - name: Formatuj i analizuj
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          dart format lib test tool
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Uruchom testy
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: flutter test
+
+      - name: Zbuduj APK i AAB
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          flutter build apk --release --build-name 0.12.0 --build-number 13
+          flutter build appbundle --release --build-name 0.12.0 --build-number 13
+
+      - name: Przygotuj wydanie
+        working-directory: ${{ steps.project.outputs.dir }}
+        run: |
+          mkdir -p release
+          cp build/app/outputs/flutter-apk/app-release.apk release/Grunwald_2026_V12.apk
+          cp build/app/outputs/bundle/release/app-release.aab release/Grunwald_2026_V12.aab
+          cd release
+          sha256sum Grunwald_2026_V12.apk Grunwald_2026_V12.aab > Grunwald_2026_V12_SHA256.txt
+
+      - name: Zachowaj pliki kompilacji
+        uses: actions/upload-artifact@v4
+        with:
+          name: Grunwald-2026-V12
+          path: ${{ steps.project.outputs.dir }}/release/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Opublikuj w Releases
+        working-directory: ${{ steps.project.outputs.dir }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v0.12.0-build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          gh release create "$TAG" \
+            release/Grunwald_2026_V12.apk \
+            release/Grunwald_2026_V12.aab \
+            release/Grunwald_2026_V12_SHA256.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Grunwald 2026 V12 — build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
+            --notes "V12: prowadzenie po drogach, czytelniejsza mapa, filtry, wyszukiwanie miejsc, ulubione wydarzenia i rozbudowana administracja."
