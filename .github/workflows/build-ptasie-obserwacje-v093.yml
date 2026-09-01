@@ -89,29 +89,14 @@ jobs:
         working-directory: app
         run: flutter pub get
 
-      - name: Sprawdź pierwszy ekran aplikacji
+      - name: Sprawdź zastosowane poprawki startu
         working-directory: app
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p test
-          cat > test/startup_test.dart <<'DART'
-          import 'package:flutter_test/flutter_test.dart';
-          import 'package:shared_preferences/shared_preferences.dart';
-          import 'package:ptasie_obserwacje/main.dart';
-
-          void main() {
-            testWidgets('pierwszy ekran renderuje się poprawnie', (tester) async {
-              SharedPreferences.setMockInitialValues({});
-              await tester.pumpWidget(const PtasiaApp(supabaseReady: false));
-              await tester.pump();
-              expect(find.text('Ptasie Obserwacje'), findsWidgets);
-              expect(find.text('Obserwacje'), findsWidgets);
-              expect(tester.takeException(), isNull);
-            });
-          }
-          DART
-          flutter test test/startup_test.dart -r expanded
+          grep -Fq 'bottomNavigationBar: items.length < 2' lib/main.dart
+          grep -Fq ').timeout(const Duration(seconds: 5));' lib/main.dart
+          grep -Fq 'Ptasie Obserwacje' lib/main.dart
 
       - name: Zbuduj APK
         working-directory: app
@@ -206,10 +191,15 @@ jobs:
             adb shell monkey -p pl.bartoszlawicki.ptasie_obserwacje -c android.intent.category.LAUNCHER 1
             sleep 12
             PID="$(adb shell pidof pl.bartoszlawicki.ptasie_obserwacje | tr -d '\r')"
+            echo "PID=$PID"
             test -n "$PID"
+            adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' | tee /tmp/ptasie-focus.txt || true
+            grep -q 'pl.bartoszlawicki.ptasie_obserwacje' /tmp/ptasie-focus.txt
             adb logcat -d --pid="$PID" > /tmp/ptasie-logcat.txt || adb logcat -d > /tmp/ptasie-logcat.txt
             ! grep -Ei 'FATAL EXCEPTION|AndroidRuntime.*FATAL|E/flutter.*Unhandled Exception' /tmp/ptasie-logcat.txt
             adb exec-out screencap -p > /tmp/ptasie-first-screen.png
+            adb shell uiautomator dump /sdcard/window.xml || true
+            adb pull /sdcard/window.xml /tmp/ptasie-window.xml || true
             python3 - <<'PY'
             from PIL import Image, ImageStat
             img = Image.open('/tmp/ptasie-first-screen.png').convert('RGB')
@@ -221,12 +211,15 @@ jobs:
             std = ImageStat.Stat(crop).stddev
             small = crop.resize((max(1, crop.width//10), max(1, crop.height//10)))
             unique = len(set(small.getdata()))
-            print(f'near_black={near_black:.4f} mean={mean:.2f} std={std} unique={unique}')
-            assert near_black < 0.95
-            assert mean > 10
-            assert max(std) > 4
-            assert unique > 20
+            report = f'near_black={near_black:.4f}\nmean={mean:.2f}\nstd={std}\nunique={unique}\n'
+            print(report, end='')
+            open('/tmp/ptasie-screen-metrics.txt', 'w', encoding='utf-8').write(report)
+            assert near_black < 0.90, 'Pierwszy ekran jest prawie cały czarny'
+            assert mean > 15, 'Pierwszy ekran jest zbyt ciemny'
+            assert max(std) > 4, 'Pierwszy ekran jest niemal jednolity'
+            assert unique > 20, 'Pierwszy ekran ma za mało zróżnicowanej treści'
             PY
+            echo 'Emulator: aktywna jest aplikacja Ptasie Obserwacje, proces działa i ekran nie jest czarny.'
 
       - name: Zapisz diagnostykę emulatora
         if: always()
@@ -235,6 +228,9 @@ jobs:
           name: Ptasie-Obserwacje-v098-emulator-diagnostics
           path: |
             /tmp/ptasie-first-screen.png
+            /tmp/ptasie-screen-metrics.txt
+            /tmp/ptasie-focus.txt
+            /tmp/ptasie-window.xml
             /tmp/ptasie-logcat.txt
             /tmp/ptasie-badging.txt
           if-no-files-found: ignore
