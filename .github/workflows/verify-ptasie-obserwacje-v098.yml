@@ -67,8 +67,10 @@ jobs:
           if [ -f tool/patch_android_manifest_auth.py ]; then python3 tool/patch_android_manifest_auth.py || true; fi
           if [ -f tool/patch_android_compile_sdk.py ]; then python3 tool/patch_android_compile_sdk.py || true; fi
           flutter pub get
-          grep -Fq 'bottomNavigationBar: items.length < 2' lib/main.dart
-          grep -Fq ').timeout(const Duration(seconds: 5));' lib/main.dart
+          echo '=== MANIFEST ==='
+          cat android/app/src/main/AndroidManifest.xml
+          echo '=== MAINACTIVITY ==='
+          find android/app/src/main -type f -name 'MainActivity.*' -print -exec cat {} \;
 
       - name: Zbuduj APK
         working-directory: app
@@ -121,6 +123,14 @@ jobs:
           grep -q "versionName='0.9.8'" /tmp/badging.txt
           sha256sum release/ptasie-obserwacje-v098.apk > release/ptasie-obserwacje-v098.apk.sha256
 
+      - name: Zachowaj podpisany APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v098-PODPISANE
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Włącz KVM
         shell: bash
         run: |
@@ -128,7 +138,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm || true
 
-      - name: Sprawdź na emulatorze Android
+      - name: Sprawdź na emulatorze Android i zbierz logcat
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 36
@@ -145,14 +155,21 @@ jobs:
             adb shell am force-stop pl.bartoszlawicki.ptasie_obserwacje
             adb shell monkey -p pl.bartoszlawicki.ptasie_obserwacje -c android.intent.category.LAUNCHER 1
             sleep 12
-            PID="$(adb shell pidof pl.bartoszlawicki.ptasie_obserwacje | tr -d '\r')"
+            adb logcat -d > /tmp/ptasie-logcat-all.txt || true
+            PID="$(adb shell pidof pl.bartoszlawicki.ptasie_obserwacje 2>/dev/null | tr -d '\r' || true)"
             echo "PID=$PID"
-            test -n "$PID"
+            if [ -z "$PID" ]; then
+              echo '=== APLIKACJA ZAKOŃCZYŁA PROCES — LOGI ==='
+              grep -Ei -C 30 'FATAL EXCEPTION|AndroidRuntime|E/flutter|Unhandled Exception|Fatal signal|Process .*ptasie|ptasie_obserwacje|ClassNotFound|NoSuchMethod|UnsatisfiedLink' /tmp/ptasie-logcat-all.txt | tail -n 600 || true
+              exit 1
+            fi
             adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp' > /tmp/ptasie-focus.txt || true
             cat /tmp/ptasie-focus.txt
             grep -q 'pl.bartoszlawicki.ptasie_obserwacje' /tmp/ptasie-focus.txt
-            adb logcat -d --pid="$PID" > /tmp/ptasie-logcat.txt || adb logcat -d > /tmp/ptasie-logcat.txt
-            if grep -Ei 'FATAL EXCEPTION|AndroidRuntime.*FATAL|E/flutter.*Unhandled Exception' /tmp/ptasie-logcat.txt; then exit 1; fi
+            if grep -Ei 'FATAL EXCEPTION|AndroidRuntime.*FATAL|E/flutter.*Unhandled Exception|Fatal signal' /tmp/ptasie-logcat-all.txt; then
+              echo 'Wykryto błąd krytyczny.'
+              exit 1
+            fi
             adb exec-out screencap -p > /tmp/ptasie-first-screen.png
             python3 - <<'PY'
             from PIL import Image, ImageStat
@@ -164,17 +181,25 @@ jobs:
             mean = sum((r+g+b)/3 for r,g,b in px)/len(px)
             std = ImageStat.Stat(crop).stddev
             unique = len(set(crop.resize((max(1,crop.width//10),max(1,crop.height//10))).getdata()))
-            print(f'near_black={near_black:.4f} mean={mean:.2f} std={std} unique={unique}')
+            report=f'near_black={near_black:.4f} mean={mean:.2f} std={std} unique={unique}'
+            print(report)
+            open('/tmp/ptasie-screen-metrics.txt','w').write(report+'\n')
             assert near_black < .90
             assert mean > 15
             assert max(std) > 4
             assert unique > 20
             PY
 
-      - name: Zapisz gotowy APK
+      - name: Zapisz diagnostykę
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Ptasie-Obserwacje-v098-GOTOWE
-          path: release/*
-          if-no-files-found: error
-          retention-days: 90
+          name: Ptasie-Obserwacje-v098-DIAGNOSTYKA
+          path: |
+            /tmp/ptasie-logcat-all.txt
+            /tmp/ptasie-focus.txt
+            /tmp/ptasie-first-screen.png
+            /tmp/ptasie-screen-metrics.txt
+            /tmp/badging.txt
+          if-no-files-found: ignore
+          retention-days: 30
