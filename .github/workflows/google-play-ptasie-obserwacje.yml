@@ -1,0 +1,181 @@
+name: Google Play - Ptasie Obserwacje v0.9.9
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/google-play-ptasie-obserwacje.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v4
+
+      - name: Ustaw Javę
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Ustaw Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Przygotuj źródła
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf app
+          mkdir app
+          unzip -q PTASIE_OBSERWACJE_v093.zip -d app
+          sed -i 's/^version: .*/version: 0.9.9+106/' app/pubspec.yaml
+          python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/lib/main.dart')
+          s = p.read_text(encoding='utf-8')
+          old = "      );\n      supabaseReady = true;"
+          new = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
+          if old in s:
+              s = s.replace(old, new, 1)
+          old_nav = "      bottomNavigationBar: SafeArea(\n        top: false,\n        minimum: const EdgeInsets.only(bottom: 10),\n        child: Padding(\n          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n          child: NavigationBar(\n            height: 72,\n            selectedIndex: min(state.currentTab, items.length - 1),\n            onDestinationSelected: state.setTab,\n            destinations: items,\n          ),\n        ),\n      ),"
+          new_nav = "      bottomNavigationBar: items.length < 2\n          ? null\n          : SafeArea(\n              top: false,\n              minimum: const EdgeInsets.only(bottom: 10),\n              child: Padding(\n                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n                child: NavigationBar(\n                  height: 72,\n                  selectedIndex: min(state.currentTab, items.length - 1),\n                  onDestinationSelected: state.setTab,\n                  destinations: items,\n                ),\n              ),\n            ),"
+          if old_nav in s:
+              s = s.replace(old_nav, new_nav, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+
+      - name: Wygeneruj Android i ustaw API 36
+        working-directory: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          flutter create --platforms android --org pl.bartoszlawicki .
+          python3 tool/patch_android_variant.py
+          if [ -f tool/patch_android_native_file_picker.py ]; then python3 tool/patch_android_native_file_picker.py; fi
+          if [ -f tool/patch_android_manifest.py ]; then python3 tool/patch_android_manifest.py || true; fi
+          if [ -f tool/patch_android_manifest_auth.py ]; then python3 tool/patch_android_manifest_auth.py || true; fi
+          if [ -f tool/patch_android_compile_sdk.py ]; then python3 tool/patch_android_compile_sdk.py || true; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['android/app/build.gradle.kts', 'android/app/build.gradle']:
+              p = Path(name)
+              if not p.exists():
+                  continue
+              s = p.read_text(encoding='utf-8')
+              s = s.replace('compileSdk = flutter.compileSdkVersion', 'compileSdk = 36')
+              s = s.replace('targetSdk = flutter.targetSdkVersion', 'targetSdk = 36')
+              s = s.replace('compileSdkVersion flutter.compileSdkVersion', 'compileSdkVersion 36')
+              s = s.replace('targetSdkVersion flutter.targetSdkVersion', 'targetSdkVersion 36')
+              p.write_text(s, encoding='utf-8')
+          PY
+          flutter pub get
+
+      - name: Zbuduj APK i AAB
+        working-directory: app
+        env:
+          SUPABASE_URL: https://ksskwqcbnultkwxjsgor.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_h7hTCQnCsGGN_MWswivJAA_ILjb3p6M
+          SUPABASE_OAUTH_REDIRECT_TO: ${{ secrets.SUPABASE_OAUTH_REDIRECT_TO }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=(
+            --dart-define=SUPABASE_URL="$SUPABASE_URL"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_OAUTH_REDIRECT_TO="${SUPABASE_OAUTH_REDIRECT_TO:-io.supabase.flutter://login-callback/}"
+            --dart-define=APP_VERSION_NAME="0.9.9"
+            --dart-define=APP_VERSION_CODE="106"
+          )
+          flutter build apk --release "${ARGS[@]}"
+          flutter build appbundle --release "${ARGS[@]}"
+
+      - name: Przygotuj klucz podpisu
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_BASE64_PART_1: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_1 }}
+          ANDROID_KEYSTORE_BASE64_PART_2: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_2 }}
+          ANDROID_KEYSTORE_BASE64_PART_3: ${{ secrets.ANDROID_KEYSTORE_BASE64_PART_3 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" ] || [ -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}" ]; then
+            test -n "${ANDROID_KEYSTORE_BASE64_PART_1:-}" && test -n "${ANDROID_KEYSTORE_BASE64_PART_2:-}" && test -n "${ANDROID_KEYSTORE_BASE64_PART_3:-}"
+            P1="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_1" | tr -d '[:space:]')"
+            P2="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_2" | tr -d '[:space:]')"
+            P3="$(printf '%s' "$ANDROID_KEYSTORE_BASE64_PART_3" | tr -d '[:space:]')"
+            RAW="${P1#ANDROID_KEYSTORE_BASE64_PART_1=}${P2#ANDROID_KEYSTORE_BASE64_PART_2=}${P3#ANDROID_KEYSTORE_BASE64_PART_3=}"
+          else
+            RAW="${ANDROID_KEYSTORE_BASE64#ANDROID_KEYSTORE_BASE64=}"
+          fi
+          test -n "$RAW"
+          printf '%s' "$RAW" | tr -d '[:space:]' | base64 --decode > upload-keystore.jks
+          printf 'SIGNING_STORE_PASSWORD=%s\n' "${ANDROID_KEYSTORE_PASSWORD#ANDROID_KEYSTORE_PASSWORD=}" >> "$GITHUB_ENV"
+          printf 'SIGNING_KEY_ALIAS=%s\n' "${ANDROID_KEY_ALIAS#ANDROID_KEY_ALIAS=}" >> "$GITHUB_ENV"
+          printf 'SIGNING_KEY_PASSWORD=%s\n' "${ANDROID_KEY_PASSWORD#ANDROID_KEY_PASSWORD=}" >> "$GITHUB_ENV"
+
+      - name: Podpisz i zweryfikuj pliki
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          mkdir -p release
+
+          "$BUILD_TOOLS/zipalign" -p -f 4 app/build/app/outputs/flutter-apk/app-release.apk release/ptasie-obserwacje-v099-aligned.apk
+          "$BUILD_TOOLS/apksigner" sign \
+            --ks upload-keystore.jks \
+            --ks-key-alias "$SIGNING_KEY_ALIAS" \
+            --ks-pass "env:SIGNING_STORE_PASSWORD" \
+            --key-pass "env:SIGNING_KEY_PASSWORD" \
+            --out release/ptasie-obserwacje-v099.apk \
+            release/ptasie-obserwacje-v099-aligned.apk
+          rm release/ptasie-obserwacje-v099-aligned.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs release/ptasie-obserwacje-v099.apk
+
+          cp app/build/app/outputs/bundle/release/app-release.aab release/ptasie-obserwacje-v099.aab
+          zip -d release/ptasie-obserwacje-v099.aab 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' >/dev/null 2>&1 || true
+          jarsigner \
+            -keystore upload-keystore.jks \
+            -storepass "$SIGNING_STORE_PASSWORD" \
+            -keypass "$SIGNING_KEY_PASSWORD" \
+            release/ptasie-obserwacje-v099.aab "$SIGNING_KEY_ALIAS"
+          jarsigner -verify -verbose -certs release/ptasie-obserwacje-v099.aab >/tmp/aab-verify.txt
+
+          "$BUILD_TOOLS/aapt" dump badging release/ptasie-obserwacje-v099.apk | tee /tmp/badging.txt
+          grep -q "versionName='0.9.9'" /tmp/badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/badging.txt
+          grep -q "package: name='pl.bartoszlawicki.ptasie_obserwacje'" /tmp/badging.txt
+          sha256sum release/ptasie-obserwacje-v099.apk > release/ptasie-obserwacje-v099.apk.sha256
+          sha256sum release/ptasie-obserwacje-v099.aab > release/ptasie-obserwacje-v099.aab.sha256
+
+      - name: Zapisz paczkę Google Play
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ptasie-Obserwacje-v099-Google-Play
+          path: release/*
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Utwórz wydanie
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ptasie_obserwacje-v0.9.9
+          name: Ptasie Obserwacje v0.9.9 - Google Play
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
