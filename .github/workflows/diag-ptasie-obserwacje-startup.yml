@@ -17,23 +17,20 @@ jobs:
       - name: Pobierz repozytorium
         uses: actions/checkout@v4
 
-      - name: Rozpakuj i pokaż ekran startowy oraz patche Android
+      - name: Pokaż kod AppState i ścieżkę startową
         shell: bash
         run: |
           set -euo pipefail
           rm -rf /tmp/ptasie-src
           mkdir -p /tmp/ptasie-src
           unzip -q PTASIE_OBSERWACJE_v093.zip -d /tmp/ptasie-src
-          echo '=== HOME PAGE 3740-3930 ==='
-          sed -n '3740,3930p' /tmp/ptasie-src/lib/main.dart
-          for f in \
-            tool/patch_android_variant.py \
-            tool/patch_android_native_file_picker.py \
-            tool/patch_android_manifest.py \
-            tool/patch_android_manifest_auth.py \
-            tool/patch_android_compile_sdk.py; do
-            echo "=== $f ==="
-            if [ -f "/tmp/ptasie-src/$f" ]; then cat "/tmp/ptasie-src/$f"; else echo 'BRAK'; fi
-          done
-          echo '=== ANDROID FILES IN ZIP ==='
-          unzip -l PTASIE_OBSERWACJE_v093.zip | grep -E 'android/|tool/' | head -n 240 || true
+          echo '=== KLASY I INIT ==='
+          grep -nE '^class AppState|Future<.*init\(|void init\(|init\(\)|supabaseReady|Supabase\.instance|_load|load[A-Z]|restore|SharedPreferences|getInstance' /tmp/ptasie-src/lib/main.dart | head -n 400 || true
+          echo '=== POCZATEK APPSTATE ==='
+          START=$(grep -n '^class AppState' /tmp/ptasie-src/lib/main.dart | head -n1 | cut -d: -f1 || true)
+          if [ -n "$START" ]; then
+            END=$((START+950))
+            sed -n "${START},${END}p" /tmp/ptasie-src/lib/main.dart
+          fi
+          echo '=== MAIN 70-180 ==='
+          sed -n '70,180p' /tmp/ptasie-src/lib/main.dart
