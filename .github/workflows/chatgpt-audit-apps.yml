@@ -1,0 +1,122 @@
+name: ChatGPT - audit all app sources
+
+on:
+  push:
+    branches:
+      - chatgpt/full-apps-review-2026-09-29
+    paths:
+      - "apps/**"
+      - ".github/workflows/chatgpt-audit-apps.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter-apps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - ptasie-budki
+          - ptasie-obserwacje
+          - grunwald
+          - lowca-mieszkan
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/full-apps-review-2026-09-29
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Dependencies
+        working-directory: apps/${{ matrix.app }}
+        run: flutter pub get
+
+      - name: Analyze
+        working-directory: apps/${{ matrix.app }}
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+        run: |
+          if [[ -d test ]] && find test -type f -name '*_test.dart' | grep -q .; then
+            flutter test
+          else
+            echo "No tests yet"
+          fi
+
+      - name: Generate Android
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf android
+          if [[ "${{ matrix.app }}" == "grunwald" ]]; then
+            flutter create --platforms android --org pl.grunwald --project-name grunwald_navigator .
+            python3 tool/patch_android.py
+          elif [[ "${{ matrix.app }}" == "lowca-mieszkan" ]]; then
+            flutter create --platforms android --org pl.bartoszlawicki --project-name lowca_mieszkan_android .
+            python3 tool/patch_android.py
+          else
+            flutter create --platforms android --org pl.bartoszlawicki .
+            python3 tool/patch_android_variant.py
+            [[ ! -f tool/patch_android_native_file_picker.py ]] || python3 tool/patch_android_native_file_picker.py
+            [[ ! -f tool/patch_android_manifest.py ]] || python3 tool/patch_android_manifest.py
+            [[ ! -f tool/patch_android_manifest_auth.py ]] || python3 tool/patch_android_manifest_auth.py
+            [[ ! -f tool/patch_android_compile_sdk.py ]] || python3 tool/patch_android_compile_sdk.py
+          fi
+
+      - name: Build release APK
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+        env:
+          SUPABASE_URL: https://ksskwqcbnultkwxjsgor.supabase.co
+          SUPABASE_ANON_KEY: sb_publishable_h7hTCQnCsGGN_MWswivJAA_ILjb3p6M
+        run: |
+          set -euo pipefail
+          if [[ "${{ matrix.app }}" == ptasie-* ]]; then
+            flutter build apk --release               --dart-define=SUPABASE_URL="$SUPABASE_URL"               --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"               --dart-define=SUPABASE_OAUTH_REDIRECT_TO="io.supabase.flutter://login-callback/"
+          else
+            flutter build apk --release
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audit-${{ matrix.app }}-apk
+          path: apps/${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  zglos-obraczke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/full-apps-review-2026-09-29
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.13"
+      - name: Build and lint
+        working-directory: apps/zglos-obraczke
+        run: |
+          gradle :app:assembleDebug
+          gradle :app:lintDebug
