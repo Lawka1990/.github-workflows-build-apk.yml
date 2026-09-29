@@ -2,11 +2,6 @@ name: Zbuduj Grunwald 2026 V12
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/rozpakuj-zip-i-zbuduj-v12.yml"
 
 permissions:
   contents: write
