@@ -1056,7 +1056,7 @@ class _StartPageState extends State<StartPage> {
                 SwitchListTile.adaptive(
                   value: widget.criteria.secondaryOnly,
                   contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.green,
+                  activeThumbColor: AppColors.green,
                   title: const Text(
                     'Tylko rynek wtórny',
                     style: TextStyle(fontWeight: FontWeight.w800),
@@ -1161,7 +1161,7 @@ class HeaderHome extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.blue.withOpacity(.3),
+                    color: AppColors.blue.withValues(alpha: .3),
                     blurRadius: 28,
                     offset: const Offset(0, 10),
                   ),
@@ -1321,7 +1321,7 @@ class PortalOpenCard extends StatelessWidget {
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: link.color.withOpacity(.14),
+                  color: link.color.withValues(alpha: .14),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: FittedBox(
@@ -2284,7 +2284,7 @@ class _OfferEditorPageState extends State<OfferEditorPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: city,
+              initialValue: city,
               decoration: const InputDecoration(
                 labelText: 'Miasto',
                 prefixIcon: Icon(Icons.location_city_rounded),
@@ -2346,7 +2346,7 @@ class _OfferEditorPageState extends State<OfferEditorPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: ownership,
+              initialValue: ownership,
               isExpanded: true,
               decoration: const InputDecoration(
                 labelText: 'Forma własności',
@@ -2366,7 +2366,7 @@ class _OfferEditorPageState extends State<OfferEditorPage> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: status,
+              initialValue: status,
               decoration: const InputDecoration(
                 labelText: 'Etap oferty',
                 prefixIcon: Icon(Icons.flag_outlined),
@@ -2422,7 +2422,7 @@ class _OfferEditorPageState extends State<OfferEditorPage> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: analysisColor(analysis.score).withOpacity(.1),
+                color: analysisColor(analysis.score).withValues(alpha: .1),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: analysisColor(analysis.score)),
               ),
@@ -2765,7 +2765,7 @@ class SettingsAction extends StatelessWidget {
               width: 43,
               height: 43,
               decoration: BoxDecoration(
-                color: AppColors.blue.withOpacity(.12),
+                color: AppColors.blue.withValues(alpha: .12),
                 borderRadius: BorderRadius.circular(13),
               ),
               child: Icon(icon, color: AppColors.blue),
@@ -2974,7 +2974,7 @@ class CardBox extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(.16),
+            color: Colors.black.withValues(alpha: .16),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -3205,9 +3205,9 @@ class TinyTag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(.14),
+        color: color.withValues(alpha: .14),
         borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: color.withOpacity(.45)),
+        border: Border.all(color: color.withValues(alpha: .45)),
       ),
       child: Text(
         text,
@@ -3262,7 +3262,7 @@ class PortalTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
-              color: link.color.withOpacity(.2),
+              color: link.color.withValues(alpha: .2),
               blurRadius: 14,
               offset: const Offset(0, 7),
             ),
@@ -3308,9 +3308,9 @@ class VersionBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: AppColors.blue.withOpacity(.13),
+          color: AppColors.blue.withValues(alpha: .13),
           borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: AppColors.blue.withOpacity(.65)),
+          border: Border.all(color: AppColors.blue.withValues(alpha: .65)),
         ),
         child: const Text(
           appVersionLabel,
