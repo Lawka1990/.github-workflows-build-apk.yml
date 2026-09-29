@@ -91,7 +91,7 @@ Future<void> main() async {
     try {
       await Supabase.initialize(
         url: cleanUrl,
-        anonKey: supabaseAnonKey,
+        publishableKey: supabaseAnonKey,
         authOptions: const FlutterAuthClientOptions(
           // W tej aplikacji zostawiamy implicit, bo jest prostszy i bardziej
           // odporny przy deep linkach na Androidzie: Google login, potwierdzenie
@@ -891,9 +891,7 @@ class AppState extends ChangeNotifier {
             .limit(25);
 
         for (final row in rows) {
-          if (row is Map) {
-            addCandidate(NestSite.fromServerMap(Map<String, dynamic>.from(row)));
-          }
+          addCandidate(NestSite.fromServerMap(Map<String, dynamic>.from(row)));
         }
       } catch (_) {
         // Brak internetu albo brak tabeli nie może blokować dodawania obiektu.
@@ -3972,9 +3970,9 @@ class _RoleChip extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 98),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.20)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Text(
         label,
@@ -4042,7 +4040,7 @@ class PtasiaStrefaBanner extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (_, __, ___) => CircleAvatar(
                     radius: compact ? 18 : 22,
-                    backgroundColor: primary.withOpacity(0.12),
+                    backgroundColor: primary.withValues(alpha: 0.12),
                     child: Icon(Icons.flutter_dash, color: primary),
                   ),
                 ),
@@ -4099,7 +4097,7 @@ class _BannerButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.86),
+            color: Colors.white.withValues(alpha: 0.86),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: const Color(0xFFD3E7C5)),
           ),
@@ -4275,7 +4273,7 @@ class _MapPageState extends State<MapPage> {
                     child: Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.blue.withOpacity(0.18),
+                        color: Colors.blue.withValues(alpha: 0.18),
                         border: Border.all(color: Colors.blue, width: 3),
                       ),
                       child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
@@ -4318,7 +4316,7 @@ class _MapPageState extends State<MapPage> {
             right: 94,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.92),
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10)],
               ),
@@ -4462,7 +4460,7 @@ class _SiteSearchCardState extends State<SiteSearchCard> {
     final results = widget.sites.take(maxResults).toList();
 
     return Material(
-      color: Colors.white.withOpacity(0.95),
+      color: Colors.white.withValues(alpha: 0.95),
       borderRadius: BorderRadius.circular(18),
       elevation: widget.compact ? 6 : 0,
       shadowColor: Colors.black26,
@@ -4718,7 +4716,7 @@ class _MapStatsBanner extends StatelessWidget {
     if (state.pickingOnMap) {
       return DecoratedBox(
         decoration: BoxDecoration(
-          color: const Color(0xFFFFF8E1).withOpacity(0.97),
+          color: const Color(0xFFFFF8E1).withValues(alpha: 0.97),
           borderRadius: BorderRadius.circular(26),
           border: Border.all(color: const Color(0xFFE2C474)),
           boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 14, offset: Offset(0, 6))],
@@ -4799,7 +4797,7 @@ class _MapStatItem extends StatelessWidget {
       children: [
         CircleAvatar(
           radius: 18,
-          backgroundColor: Colors.white.withOpacity(0.18),
+          backgroundColor: Colors.white.withValues(alpha: 0.18),
           child: Icon(icon, size: 18, color: Colors.white),
         ),
         const SizedBox(height: 4),
@@ -5048,7 +5046,7 @@ class _AddSitePageState extends State<AddSitePage> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           DropdownButtonFormField<String>(
-            value: type,
+            initialValue: type,
             decoration: const InputDecoration(labelText: 'Typ obiektu'),
             items: objectTypes.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) => setState(() => type = v ?? type),
@@ -5059,7 +5057,7 @@ class _AddSitePageState extends State<AddSitePage> {
           TextField(controller: place, decoration: const InputDecoration(labelText: 'Opis miejsca')),
           const SizedBox(height: 10),
           DropdownButtonFormField<String>(
-            value: status,
+            initialValue: status,
             decoration: const InputDecoration(labelText: 'Stan techniczny'),
             items: technicalStatuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) => setState(() => status = v ?? status),
@@ -6141,7 +6139,7 @@ class BirdObservationsFullscreenMapPage extends StatelessWidget {
             child: SafeArea(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.92),
+                  color: Colors.white.withValues(alpha: 0.92),
                   borderRadius: BorderRadius.circular(18),
                   boxShadow: const [
                     BoxShadow(color: Color(0x22000000), blurRadius: 10, offset: Offset(0, 3)),
@@ -6661,9 +6659,9 @@ class NestBoxOccupancyStatsCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppTheme.green.withOpacity(0.12),
+                          color: AppTheme.green.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: AppTheme.green.withOpacity(0.35)),
+                          border: Border.all(color: AppTheme.green.withValues(alpha: 0.35)),
                         ),
                         child: Text(
                           '${top[i].value} bud.',
@@ -7073,7 +7071,7 @@ class _AddInspectionPageState extends State<AddInspectionPage> {
           ),
           if (cleaned) TextField(controller: cleanedBy, decoration: const InputDecoration(labelText: 'Kto czyścił')),
           DropdownButtonFormField<String>(
-            value: condition,
+            initialValue: condition,
             decoration: const InputDecoration(labelText: 'Stan'),
             items: technicalStatuses.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
             onChanged: (v) => setState(() => condition = v ?? condition),
