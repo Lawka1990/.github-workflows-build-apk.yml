@@ -1,7 +1,7 @@
 name: ptasie_obserwacje
-description: Ptasia Mapa - czysta wersja od nowa.
+description: Ptasie Obserwacje - mapa i rejestr obserwacji ptaków.
 publish_to: "none"
-version: 0.9.3+99
+version: 0.9.9+106
 
 environment:
   sdk: ">=3.4.0 <4.0.0"

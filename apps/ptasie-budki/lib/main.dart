@@ -3847,6 +3847,39 @@ class HomePage extends StatelessWidget {
         flexibleSpace: const _ForestGradient(),
         title: _AppTitle(state: state),
         actions: [
+          PopupMenuButton<String>(
+            tooltip: 'Ptasia Strefa',
+            icon: const Icon(Icons.public),
+            onSelected: (value) {
+              if (value == 'www') {
+                _openUrl('https://ptasiastrefa.pl/');
+              } else if (value == 'yt') {
+                _openUrl('https://www.youtube.com/@ptasiastrefa');
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem<String>(
+                value: 'www',
+                child: Row(
+                  children: [
+                    Icon(Icons.language),
+                    SizedBox(width: 10),
+                    Text('Ptasia Strefa — strona'),
+                  ],
+                ),
+              ),
+              PopupMenuItem<String>(
+                value: 'yt',
+                child: Row(
+                  children: [
+                    Icon(Icons.play_circle_fill),
+                    SizedBox(width: 10),
+                    Text('Ptasia Strefa — YouTube'),
+                  ],
+                ),
+              ),
+            ],
+          ),
           IconButton(
             onPressed: () => _showInfoDialog(context),
             icon: const Icon(Icons.info_outline),
@@ -3912,16 +3945,7 @@ class PtasiaSplitVariantBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      color: const Color(0xFFEAF6E6),
-      child: const Text(
-        'Ptasie Budki — Ta wersja zawiera tylko funkcje budek: mapa budek, lista, blisko, naprawy, czyszczenie, admin.',
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }
 

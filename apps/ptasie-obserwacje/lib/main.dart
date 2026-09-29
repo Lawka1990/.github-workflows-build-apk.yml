@@ -98,7 +98,7 @@ Future<void> main() async {
           // emaila i reset hasła wracają tym samym callbackiem do aplikacji.
           authFlowType: AuthFlowType.implicit,
         ),
-      );
+      ).timeout(const Duration(seconds: 5));
       supabaseReady = true;
     } catch (_) {
       supabaseReady = false;
