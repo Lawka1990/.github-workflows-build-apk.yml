@@ -1,0 +1,24 @@
+GRUNWALD NAVIGATOR 2026 — V12
+Wersja aplikacji: 0.12.0+13
+Pakiet Android: pl.grunwald.grunwald_navigator
+
+NOWOŚCI V12
+- orientacyjne prowadzenie po głównych drogach planu,
+- przybliżona długość trasy i automatyczne kadrowanie,
+- filtry kategorii znaczników mapy,
+- wyszukiwarka miejsc bez konieczności wpisywania polskich znaków,
+- szczegóły miejsc i wydarzeń,
+- ulubione wydarzenia zapisywane na telefonie,
+- wygodniejszy wybór dnia i kategorii programu,
+- rozbudowany edytor punktów: opis, kategoria, ikona i kolor,
+- trwały zapis zmian wbudowanych punktów,
+- czytelny stan administratora i możliwość jego wyłączenia,
+- lepsze komunikaty GPS i przejście do ustawień telefonu,
+- dodatkowe testy nawigacji i wyszukiwania,
+- dokładniejszy audyt danych oraz obrazu mapy.
+
+ZACHOWANO
+- mapę 1536x1024,
+- 38 miejsc i 49 wydarzeń,
+- terenową kotwicę sanitariatów 53.4866200, 20.1251800,
+- lokalne dane V11 i PIN administratora 1410.

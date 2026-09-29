@@ -1,0 +1,43 @@
+KONTROLA GRUNWALD NAVIGATOR 2026 — V12
+
+WERSJA I DANE
+[OK] Wersja 0.12.0+13.
+[OK] Pakiet Android: pl.grunwald.grunwald_navigator.
+[OK] 38 miejsc i 49 wydarzeń.
+[OK] Brak powielonych identyfikatorów.
+[OK] Wszystkie wydarzenia wskazują istniejące miejsca.
+[OK] Wszystkie godziny programu mają prawidłowy format i kolejność.
+
+MAPA I GPS
+[OK] Rzeczywisty wymiar mapy: 1536x1024, proporcje 3:2.
+[OK] Znaczniki zachowują stałą wielkość podczas powiększania.
+[OK] Filtrowanie kategorii nie ukrywa wybranego celu.
+[OK] Prowadzenie korzysta z grafu głównych dróg planu.
+[OK] Początek i cel trasy są dołączane do najbliższej drogi.
+[OK] Trasa pokazuje orientacyjną odległość i mieści się na mapie.
+[OK] Pozycja poza skalibrowanym obszarem nie pozostawia starego znacznika.
+[OK] Błędy GPS mają polskie komunikaty i skrót do ustawień.
+[OK] Sanitariaty: GPS 53.4866200, 20.1251800.
+[OK] Sanitariaty: mapa x=0.7421875, y=0.8740234, piksel (1140,895).
+
+INTERFEJS
+[OK] Wyszukiwanie miejsc ignoruje wielkość liter i polskie znaki.
+[OK] Dostępne są filtry miejsc i programu.
+[OK] Dodano szczegóły miejsc i wydarzeń.
+[OK] Ulubione wydarzenia zapisują się lokalnie.
+[OK] Widok „Teraz” poprawnie informuje także po zakończeniu edycji.
+[OK] Administrator ma widoczny stan aktywności i możliwość wylogowania.
+[OK] Edytor punktów obsługuje opis, kategorię, ikonę i kolor.
+[OK] Zmiany wbudowanych punktów są zapisywane po ponownym uruchomieniu.
+
+KONTROLA AUTOMATYCZNA
+[OK] Audyt JSON, identyfikatorów, godzin, plików V12 i wymiarów mapy.
+[OK] Kontrola 37 plików Dart: domknięcie składni i lokalne importy.
+[OK] Dodano testy nawigacji i normalizacji wyszukiwania.
+[OK] Workflow wykonuje dart format, flutter analyze i flutter test.
+[OK] Workflow buduje APK oraz AAB i zapisuje je w Artifacts i Releases.
+
+OGRANICZENIE
+Mapa jest stylizowaną ilustracją. Trasa i podawana odległość są orientacyjne,
+a nie geodezyjne. Końcową kompilację Flutter wykonuje przygotowany workflow,
+ponieważ lokalne środowisko robocze nie zawiera Flutter SDK.

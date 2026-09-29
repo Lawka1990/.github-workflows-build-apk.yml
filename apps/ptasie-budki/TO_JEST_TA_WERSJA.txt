@@ -1,0 +1,6 @@
+Ptasie Budki v0.9.3
+
+Ta wersja zawiera tylko funkcje budek: mapa budek, lista, blisko, naprawy, czyszczenie, admin.
+
+Pakiet Android: pl.bartoszlawicki.ptasie_budki
+Źródło: rozdzielone z Ptasiej Mapy. Osobny identyfikator Android i stały podpis aktualizacji.

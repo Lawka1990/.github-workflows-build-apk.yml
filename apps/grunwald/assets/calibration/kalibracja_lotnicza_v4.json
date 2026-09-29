@@ -1,0 +1,194 @@
+{
+  "version": "v4",
+  "reference_image": "7096.jpg",
+  "reference_size_px": {
+    "width": 1536,
+    "height": 864
+  },
+  "method": "manual calibration from user-annotated matching frames, checked against clean aerial images",
+  "anchors": [
+    {
+      "id": 1,
+      "name": "WC",
+      "pixel": {
+        "x": 416,
+        "y": 250
+      },
+      "normalized": {
+        "x": 0.270833,
+        "y": 0.289352
+      },
+      "confidence": "wysoka",
+      "recognition_cue": "środek długiego niebieskiego rzędu toi-toi przy górnej drodze"
+    },
+    {
+      "id": 2,
+      "name": "Skrzyżowanie",
+      "pixel": {
+        "x": 307,
+        "y": 608
+      },
+      "normalized": {
+        "x": 0.19987,
+        "y": 0.703704
+      },
+      "confidence": "wysoka",
+      "recognition_cue": "węzeł drogi schodzącej od WC/sanitariatów z dolną drogą obozową"
+    },
+    {
+      "id": 3,
+      "name": "Obóz Justycji",
+      "pixel": {
+        "x": 690,
+        "y": 430
+      },
+      "normalized": {
+        "x": 0.449219,
+        "y": 0.497685
+      },
+      "confidence": "średnia-wysoka",
+      "recognition_cue": "środek wskazanego obozu, za ogrodzeniem, nad rzędem kolorowych aut"
+    },
+    {
+      "id": 4,
+      "name": "Parkur",
+      "pixel": {
+        "x": 842,
+        "y": 286
+      },
+      "normalized": {
+        "x": 0.548177,
+        "y": 0.331019
+      },
+      "confidence": "średnia-wysoka",
+      "recognition_cue": "otwarta arena przy czerwono-brązowej zabudowie na skraju lasu"
+    },
+    {
+      "id": 5,
+      "name": "Stare muzeum",
+      "pixel": {
+        "x": 1192,
+        "y": 508
+      },
+      "normalized": {
+        "x": 0.776042,
+        "y": 0.587963
+      },
+      "confidence": "wysoka",
+      "recognition_cue": "środek charakterystycznej półkolistej/owalnej budowli"
+    },
+    {
+      "id": 6,
+      "name": "Sanitariaty",
+      "pixel": {
+        "x": 350,
+        "y": 286
+      },
+      "normalized": {
+        "x": 0.227865,
+        "y": 0.331019
+      },
+      "confidence": "wysoka",
+      "recognition_cue": "długi ciemny blok pryszniców i umywalek, osobno od niebieskich WC"
+    },
+    {
+      "id": 7,
+      "name": "Kompleks pomnikowy",
+      "reference_image": "6805.jpg",
+      "pixel": {
+        "x": 720,
+        "y": 360
+      },
+      "normalized": {
+        "x": 0.46875,
+        "y": 0.416667
+      },
+      "confidence": "wysoka",
+      "recognition_cue": "wysoki pomnik, obelisk i cały plac z alejkami"
+    }
+  ],
+  "roads": {
+    "wc_to_intersection_px": [
+      [
+        307,
+        608
+      ],
+      [
+        330,
+        566
+      ],
+      [
+        350,
+        520
+      ],
+      [
+        370,
+        470
+      ],
+      [
+        390,
+        420
+      ],
+      [
+        405,
+        365
+      ],
+      [
+        416,
+        312
+      ],
+      [
+        416,
+        270
+      ]
+    ],
+    "intersection_along_camp_edge_px": [
+      [
+        307,
+        608
+      ],
+      [
+        355,
+        610
+      ],
+      [
+        420,
+        585
+      ],
+      [
+        490,
+        555
+      ],
+      [
+        560,
+        520
+      ],
+      [
+        630,
+        485
+      ],
+      [
+        705,
+        453
+      ],
+      [
+        780,
+        430
+      ],
+      [
+        855,
+        421
+      ],
+      [
+        910,
+        430
+      ]
+    ]
+  },
+  "notes": [
+    "Punkt 5 to stare muzeum, nie pomnik.",
+    "Punkt 7 oznacza cały kompleks pomnikowy.",
+    "Punkt 1 i punkt 6 są dwoma różnymi obiektami.",
+    "Punkty 3 i 4 oznaczają środki obszarów, więc nie należy traktować ich jako dokładnych granic."
+  ]
+}

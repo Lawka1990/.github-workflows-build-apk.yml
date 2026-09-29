@@ -1,0 +1,89 @@
+name: ChatGPT - normalize reviewed sources
+
+on:
+  push:
+    branches:
+      - chatgpt/full-apps-review-2026-09-29
+    paths:
+      - ".github/workflows/chatgpt-normalize-sources.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: chatgpt/full-apps-review-2026-09-29
+
+      - name: Bring Ptasie Budki source to released v0.9.6
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/^version: .*/version: 0.9.6+102/' apps/ptasie-budki/pubspec.yaml
+          sed -i 's/^description: .*/description: Ptasie Budki - mapa i obsługa budek lęgowych./' apps/ptasie-budki/pubspec.yaml
+          python3 .github/scripts/remove_ptasie_version_banner.py apps/ptasie-budki/lib/main.dart
+          python3 .github/scripts/add_ptasia_strefa_shortcuts.py apps/ptasie-budki/lib/main.dart
+
+      - name: Bring Ptasie Obserwacje source to released v0.9.9
+        shell: bash
+        run: |
+          set -euo pipefail
+          sed -i 's/^version: .*/version: 0.9.9+106/' apps/ptasie-obserwacje/pubspec.yaml
+          sed -i 's/^description: .*/description: Ptasie Obserwacje - mapa i rejestr obserwacji ptaków./' apps/ptasie-obserwacje/pubspec.yaml
+          python3 .github/scripts/remove_ptasie_version_banner.py apps/ptasie-obserwacje/lib/main.dart
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('apps/ptasie-obserwacje/lib/main.dart')
+          s=p.read_text(encoding='utf-8')
+          old="      );\n      supabaseReady = true;"
+          new="      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
+          if old in s:
+              s=s.replace(old,new,1)
+          old_nav="""      bottomNavigationBar: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(bottom: 10),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+              child: NavigationBar(
+                height: 72,
+                selectedIndex: min(state.currentTab, items.length - 1),
+                onDestinationSelected: state.setTab,
+                destinations: items,
+              ),
+            ),
+          ),"""
+          new_nav="""      bottomNavigationBar: items.length < 2
+              ? null
+              : SafeArea(
+                  top: false,
+                  minimum: const EdgeInsets.only(bottom: 10),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                    child: NavigationBar(
+                      height: 72,
+                      selectedIndex: min(state.currentTab, items.length - 1),
+                      onDestinationSelected: state.setTab,
+                      destinations: items,
+                    ),
+                  ),
+                ),"""
+          if old_nav in s:
+              s=s.replace(old_nav,new_nav,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+
+      - name: Commit normalized sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "chatgpt-review-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps/ptasie-budki apps/ptasie-obserwacje
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "chore: normalize Ptasie sources to released versions"
+          git push origin HEAD:chatgpt/full-apps-review-2026-09-29

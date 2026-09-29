@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Bardzo prosta ikona: dwie ptasie nogi z kresek i mała obrączka na jednej nodze -->
+    <path android:fillColor="#EAF6E0" android:pathData="M18,8h72a10,10 0,0 1,10 10v72a10,10 0,0 1,-10 10h-72a10,10 0,0 1,-10 -10v-72a10,10 0,0 1,10 -10z"/>
+    <path android:fillColor="#BFE6A2" android:pathData="M10,70c22,-9 54,-9 88,0v20a10,10 0,0 1,-10 10h-70a10,10 0,0 1,-10 -10v-18z"/>
+    <!-- delikatne pióra u góry nóg -->
+    <path android:strokeColor="#5B4A2F" android:strokeWidth="2" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M35,20c6,5 7,11 5,16 M44,20c-4,6 -5,12 -3,17 M62,20c6,6 7,12 5,17 M71,20c-4,6 -5,12 -3,17"/>
+    <!-- dwie nogi -->
+    <path android:strokeColor="#7A501E" android:strokeWidth="5" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M40,30 L40,68 M66,30 L66,68"/>
+    <path android:strokeColor="#E0A23A" android:strokeWidth="3" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M40,30 L40,68 M66,30 L66,68"/>
+    <!-- małe łuski -->
+    <path android:strokeColor="#8C651F" android:strokeWidth="1" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M36,40h8 M36,48h8 M36,56h8 M62,40h8 M62,56h8"/>
+    <!-- mała metalowa obrączka na prawej nodze -->
+    <path android:strokeColor="#6A7278" android:strokeWidth="3.2" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M61,49 L71,49"/>
+    <path android:strokeColor="#F7F7F7" android:strokeWidth="1.4" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M62,48.7 L70,48.7"/>
+    <!-- stopy i pazury -->
+    <path android:strokeColor="#7A501E" android:strokeWidth="4.2" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M40,68 L25,77 M40,68 L39,84 M40,68 L54,78 M40,68 L30,66 M66,68 L51,77 M66,68 L65,84 M66,68 L81,77 M66,68 L76,66"/>
+    <path android:strokeColor="#E0A23A" android:strokeWidth="2.5" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M40,68 L25,77 M40,68 L39,84 M40,68 L54,78 M40,68 L30,66 M66,68 L51,77 M66,68 L65,84 M66,68 L81,77 M66,68 L76,66"/>
+    <path android:strokeColor="#222222" android:strokeWidth="2.6" android:strokeLineCap="round" android:fillColor="#00000000" android:pathData="M25,77 L20,80 M39,84 L38,90 M54,78 L59,82 M30,66 L25,64 M51,77 L46,81 M65,84 L64,90 M81,77 L87,80 M76,66 L82,64"/>
+</vector>

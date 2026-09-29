@@ -2,10 +2,6 @@ name: Google Play - Ptasie Obserwacje v0.9.9
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/google-play-ptasie-obserwacje.yml"
 
 permissions:
   contents: write
@@ -17,10 +13,10 @@ jobs:
 
     steps:
       - name: Pobierz repozytorium
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Ustaw Javę
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -38,24 +34,10 @@ jobs:
           set -euo pipefail
           rm -rf app
           mkdir app
-          unzip -q PTASIE_OBSERWACJE_v093.zip -d app
-          sed -i 's/^version: .*/version: 0.9.9+106/' app/pubspec.yaml
-          python3 .github/scripts/remove_ptasie_version_banner.py app/lib/main.dart
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path('app/lib/main.dart')
-          s = p.read_text(encoding='utf-8')
-          old = "      );\n      supabaseReady = true;"
-          new = "      ).timeout(const Duration(seconds: 5));\n      supabaseReady = true;"
-          if old in s:
-              s = s.replace(old, new, 1)
-          old_nav = "      bottomNavigationBar: SafeArea(\n        top: false,\n        minimum: const EdgeInsets.only(bottom: 10),\n        child: Padding(\n          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n          child: NavigationBar(\n            height: 72,\n            selectedIndex: min(state.currentTab, items.length - 1),\n            onDestinationSelected: state.setTab,\n            destinations: items,\n          ),\n        ),\n      ),"
-          new_nav = "      bottomNavigationBar: items.length < 2\n          ? null\n          : SafeArea(\n              top: false,\n              minimum: const EdgeInsets.only(bottom: 10),\n              child: Padding(\n                padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),\n                child: NavigationBar(\n                  height: 72,\n                  selectedIndex: min(state.currentTab, items.length - 1),\n                  onDestinationSelected: state.setTab,\n                  destinations: items,\n                ),\n              ),\n            ),"
-          if old_nav in s:
-              s = s.replace(old_nav, new_nav, 1)
-          p.write_text(s, encoding='utf-8')
-          PY
-
+          cp -a apps/ptasie-obserwacje/. app/
+          test -f app/pubspec.yaml
+          grep -q '^version: 0.9.9+106$' app/pubspec.yaml
+          grep -Fq ').timeout(const Duration(seconds: 5));' app/lib/main.dart
       - name: Wygeneruj Android i ustaw API 36
         working-directory: app
         shell: bash
@@ -164,7 +146,7 @@ jobs:
           sha256sum release/ptasie-obserwacje-v099.aab > release/ptasie-obserwacje-v099.aab.sha256
 
       - name: Zapisz paczkę Google Play
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Ptasie-Obserwacje-v099-Google-Play
           path: release/*

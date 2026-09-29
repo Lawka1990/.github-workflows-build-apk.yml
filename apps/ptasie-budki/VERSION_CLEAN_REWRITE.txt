@@ -1,0 +1,6 @@
+Ptasia Mapa v0.8.2+82 — realna paginacja obserwacji po 5 wpisów.
+
+- poprawiono miejsce w kodzie, żeby karta Obserwacje naprawdę używała paginacji,
+- lista pokazuje 5 obserwacji naraz,
+- dodano widoczny komunikat o paginacji,
+- filtry obserwacji są domyślnie zwinięte, żeby karta szybciej się otwierała.

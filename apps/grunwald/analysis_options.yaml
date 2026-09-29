@@ -1,0 +1,29 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    avoid_print: error
+    deprecated_member_use: error
+    unused_import: error
+    unused_element: error
+    dead_code: error
+  exclude:
+    - build/**
+    - .dart_tool/**
+
+linter:
+  rules:
+    always_declare_return_types: true
+    always_use_package_imports: false
+    avoid_dynamic_calls: true
+    avoid_empty_else: true
+    avoid_print: true
+    cancel_subscriptions: true
+    close_sinks: true
+    directives_ordering: true
+    prefer_final_fields: true
+    prefer_final_locals: true
+    prefer_single_quotes: true
+    require_trailing_commas: true
+    sort_constructors_first: true
+    use_build_context_synchronously: true

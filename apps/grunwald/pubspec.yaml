@@ -1,0 +1,26 @@
+name: grunwald_navigator
+publish_to: "none"
+description: Grunwald 2026 — mapa, program i terenowa nawigacja offline.
+version: 0.12.0+13
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  geolocator: ^14.0.3
+  shared_preferences: ^2.5.5
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/data/
+    - assets/calibration/
