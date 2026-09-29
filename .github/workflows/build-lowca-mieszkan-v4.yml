@@ -1,0 +1,61 @@
+name: Build Łowca Mieszkań V4
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/lowca-mieszkan
+
+    steps:
+      - name: Pobierz repozytorium
+        uses: actions/checkout@v7
+
+      - name: Ustaw Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Ustaw Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.4"
+          channel: stable
+          cache: true
+
+      - name: Utwórz pliki Androida
+        run: |
+          rm -rf android
+          flutter create --platforms=android --org pl.bartoszlawicki --project-name lowca_mieszkan_android .
+          python3 tool/patch_android.py
+
+      - name: Pobierz paczki
+        run: flutter pub get
+
+      - name: Analiza kodu
+        run: flutter analyze
+
+      - name: Testy
+        run: flutter test
+
+      - name: Zbuduj APK i AAB
+        run: |
+          flutter build apk --release
+          flutter build appbundle --release
+
+      - name: Zapisz APK i AAB
+        uses: actions/upload-artifact@v7
+        with:
+          name: lowca-mieszkan-v4-android
+          if-no-files-found: error
+          path: |
+            apps/lowca-mieszkan/build/app/outputs/flutter-apk/app-release.apk
+            apps/lowca-mieszkan/build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
