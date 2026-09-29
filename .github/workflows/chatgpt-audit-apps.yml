@@ -1,5 +1,9 @@
 name: ChatGPT - audit all app sources
 
+concurrency:
+  group: chatgpt-app-audit-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
@@ -26,11 +30,11 @@ jobs:
           - lowca-mieszkan
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: chatgpt/full-apps-review-2026-09-29
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -47,7 +51,20 @@ jobs:
 
       - name: Analyze
         working-directory: apps/${{ matrix.app }}
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+        run: flutter analyze
+
+      - name: Security regression checks
+        if: startsWith(matrix.app, 'ptasie-')
+        working-directory: apps/${{ matrix.app }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -Fq "defaultValue: 'ptasia-admin'" lib/main.dart
+          grep -Fq "publishableKey: supabaseAnonKey" lib/main.dart
+          grep -Fq "hiddenFromUsers: isSensitive" lib/main.dart
+          grep -Fq "markSiteChanged: false" lib/main.dart
+          grep -Fq "claim_app_profile" lib/main.dart
+          grep -Fq "set_app_role" lib/main.dart
 
       - name: Test
         working-directory: apps/${{ matrix.app }}
@@ -94,7 +111,7 @@ jobs:
             flutter build apk --release
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: audit-${{ matrix.app }}-apk
           path: apps/${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
@@ -105,10 +122,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: chatgpt/full-apps-review-2026-09-29
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
