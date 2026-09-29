@@ -26,7 +26,7 @@ const bool ptasiaSplitObservationsOnly = true;
 
 const String supabaseUrl = String.fromEnvironment('SUPABASE_URL');
 const String supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
-const String adminPassword = String.fromEnvironment('ADMIN_PASSWORD', defaultValue: 'ptasia-admin');
+const String adminPassword = String.fromEnvironment('ADMIN_PASSWORD', defaultValue: '');
 const String superAdminEmail = String.fromEnvironment('SUPER_ADMIN_EMAIL', defaultValue: 'bartoszlawicki@gmail.com');
 const String oauthRedirectTo = String.fromEnvironment(
   'SUPABASE_OAUTH_REDIRECT_TO',
@@ -423,11 +423,8 @@ class AppState extends ChangeNotifier {
     if (!supabaseReady || currentUser == null) return;
 
     try {
-      await client!.from('app_profiles').upsert({
-        'user_id': currentUser!.id,
-        'email': currentUser!.email ?? '',
-        'role': isSuperAdmin ? 'super_admin' : 'user',
-      }, onConflict: 'user_id');
+      // Baza wiąże profil z zalogowanym użytkownikiem i zachowuje istniejącą rolę.
+      await client!.rpc('claim_app_profile');
 
       final row = await client!
           .from('app_profiles')
@@ -438,6 +435,7 @@ class AppState extends ChangeNotifier {
       final role = row?['role']?.toString();
       if (role != null && role.isNotEmpty) userRole = role;
     } catch (_) {
+      // Serwer nadal egzekwuje uprawnienia przez RLS/RPC.
       userRole = isSuperAdmin ? 'super_admin' : 'user';
     }
   }
@@ -568,7 +566,9 @@ class AppState extends ChangeNotifier {
   List<BirdObservation> visibleBirdObservations() {
     final active = birdObservations.where((o) => !o.deleted).toList();
     if (isAdmin) return active;
-    return active.where((o) => !o.hiddenFromUsers).toList();
+    return active
+        .where((o) => !o.hiddenFromUsers || (loggedIn && o.ownerId == currentUser!.id))
+        .toList();
   }
 
   List<BirdObservation> filteredBirdObservations() {
@@ -969,6 +969,7 @@ class AppState extends ChangeNotifier {
     }
 
     final now = DateTime.now();
+    final isSensitive = sensitive || isRareBirdSpecies(canonicalBirdSpeciesName(species));
     final obs = BirdObservation(
       id: _uuid.v4(),
       species: canonicalBirdSpeciesName(species.trim().isEmpty ? birdSpecies.first : species.trim()),
@@ -979,8 +980,8 @@ class AppState extends ChangeNotifier {
       placeDescription: placeDescription,
       behaviour: behaviour,
       notes: notes,
-      sensitive: sensitive || isRareBirdSpecies(canonicalBirdSpeciesName(species)),
-      hiddenFromUsers: false,
+      sensitive: isSensitive,
+      hiddenFromUsers: isSensitive,
       deleted: false,
       ownerId: currentUser?.id ?? localGuestId ?? 'guest',
       ownerEmail: currentUser?.email ?? 'gość',
@@ -1101,9 +1102,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateSite(NestSite site) async {
-    site.updatedAt = DateTime.now();
-    site.locallyChanged = true;
+  Future<void> updateSite(NestSite site, {bool markSiteChanged = true}) async {
+    if (markSiteChanged) {
+      site.updatedAt = DateTime.now();
+      site.locallyChanged = true;
+    }
     await saveLocal();
     notifyListeners();
   }
@@ -1243,18 +1246,18 @@ class AppState extends ChangeNotifier {
       final localBeforeSync = {for (final s in sites) s.id: s};
       final localBirdsBeforeSync = {for (final o in birdObservations) o.id: o};
 
-      // 1. Wyślij lokalne zmiany. Robimy kopię listy, żeby nie modyfikować jej podczas pętli.
-      final changedSites = sites.where((s) => s.locallyChanged).toList();
-      for (final site in changedSites) {
-        await _upsertNestSiteSafe(site);
+      // 1. Wyślij lokalne zmiany. Kontrole są niezależne od edycji samej budki.
+      for (final site in List<NestSite>.from(sites)) {
+        if (site.locallyChanged) {
+          await _upsertNestSiteSafe(site);
+          site.locallyChanged = false;
+        }
 
         final changedInspections = site.inspections.where((i) => i.locallyChanged).toList();
         for (final inspection in changedInspections) {
           await _upsertInspectionSafe(site, inspection);
           inspection.locallyChanged = false;
         }
-
-        site.locallyChanged = false;
       }
 
       final changedBirdObservations = birdObservations.where((o) => o.locallyChanged).toList();
@@ -1660,6 +1663,10 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> enableAdminWithPassword(String password) async {
+    if (adminPassword.trim().isEmpty) {
+      showError('Lokalny tryb administratora jest wyłączony. Zaloguj się na konto administratora.');
+      return;
+    }
     if (password == adminPassword) {
       adminMode = true;
       currentTab = 0;
@@ -1685,10 +1692,10 @@ class AppState extends ChangeNotifier {
       return;
     }
     try {
-      await client!.from('app_profiles').upsert({
-        'email': email.trim(),
-        'role': 'admin',
-      }, onConflict: 'email');
+      await client!.rpc('set_app_role', params: {
+        'p_email': email.trim(),
+        'p_role': 'admin',
+      });
       showInfo('Nadano uprawnienia admin dla $email');
     } catch (e) {
       showError('Błąd nadawania uprawnień: $e');
@@ -3243,6 +3250,8 @@ class Inspection {
     this.chicksCount = 0,
     this.adultsCount = 0,
     this.notes = '',
+    this.ownerId = '',
+    this.ownerEmail = '',
     this.deleted = false,
     this.locallyChanged = false,
   });
@@ -3259,6 +3268,8 @@ class Inspection {
   int chicksCount;
   int adultsCount;
   String notes;
+  String ownerId;
+  String ownerEmail;
   bool deleted;
   bool locallyChanged;
 
@@ -3275,6 +3286,8 @@ class Inspection {
         'chicksCount': chicksCount,
         'adultsCount': adultsCount,
         'notes': notes,
+        'ownerId': ownerId,
+        'ownerEmail': ownerEmail,
         'deleted': deleted,
         'locallyChanged': locallyChanged,
       };
@@ -3292,6 +3305,8 @@ class Inspection {
         chicksCount: _int(j['chicksCount']),
         adultsCount: _int(j['adultsCount']),
         notes: _string(j['notes']),
+        ownerId: _string(j['ownerId']),
+        ownerEmail: _string(j['ownerEmail']),
         deleted: _bool(j['deleted']),
         locallyChanged: _bool(j['locallyChanged']),
       );
@@ -3310,6 +3325,8 @@ class Inspection {
         'chicks_count': chicksCount,
         'adults_count': adultsCount,
         'notes': notes,
+        'owner_id': ownerId,
+        'owner_email': ownerEmail,
         'deleted': deleted,
         'updated_at': DateTime.now().toIso8601String(),
       };
@@ -3327,6 +3344,8 @@ class Inspection {
         chicksCount: _int(j['chicks_count']),
         adultsCount: _int(j['adults_count']),
         notes: _string(j['notes']),
+        ownerId: _string(j['owner_id']),
+        ownerEmail: _string(j['owner_email']),
         deleted: _bool(j['deleted']),
       );
 }
@@ -6283,6 +6302,7 @@ class _AddBirdObservationPageState extends State<AddBirdObservationPage> {
       o.behaviour = behaviour.text;
       o.notes = notes.text;
       o.sensitive = sensitive || isRareBirdSpecies(canonicalBirdSpeciesName(species));
+      if (o.sensitive) o.hiddenFromUsers = true;
       o.source = o.source.isEmpty ? 'Ptasie Obserwacje' : o.source;
       o.photoPaths = List<String>.from(photoPaths);
       await state.updateBirdObservation(o);
@@ -7108,9 +7128,11 @@ class _AddInspectionPageState extends State<AddInspectionPage> {
                 chicksCount: int.tryParse(chicks.text) ?? 0,
                 adultsCount: int.tryParse(adults.text) ?? 0,
                 notes: notes.text,
+                ownerId: state.currentUser?.id ?? '',
+                ownerEmail: state.currentUser?.email ?? '',
                 locallyChanged: true,
               ));
-              await state.updateSite(widget.site);
+              await state.updateSite(widget.site, markSiteChanged: false);
               if (!context.mounted) return;
               Navigator.of(context).pop();
             },
