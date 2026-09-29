@@ -1250,8 +1250,8 @@ class PortalLinksPage extends StatelessWidget {
               onBack: () => Navigator.pop(context),
             ),
             const SizedBox(height: 14),
-            CardBox(
-              child: const Row(
+            const CardBox(
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(Icons.tune_rounded, color: AppColors.blue, size: 28),
