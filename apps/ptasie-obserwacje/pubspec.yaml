@@ -1,0 +1,31 @@
+name: ptasie_obserwacje
+description: Ptasia Mapa - czysta wersja od nowa.
+publish_to: "none"
+version: 0.9.3+99
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^13.0.1
+  supabase_flutter: ^2.8.4
+  shared_preferences: ^2.3.2
+  uuid: ^4.5.1
+  url_launcher: ^6.3.0
+  intl: ^0.20.2
+  http: ^1.2.2
+  image_picker: ^1.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/ptasia_strefa_logo.png

@@ -1,0 +1,24 @@
+{
+  "version": "V11",
+  "map": {
+    "file": "assets/images/mapa_grunwald_2026.png",
+    "widthPx": 1536,
+    "heightPx": 1024
+  },
+  "anchorsAdded": [
+    {
+      "id": "sanitariaty_locus_2026_07_17",
+      "name": "Sanitariaty — wejście do strefy pryszniców i umywalek",
+      "latitude": 53.48662,
+      "longitude": 20.12518,
+      "mapX": 0.7421875,
+      "mapY": 0.8740234,
+      "pixelX": 1140,
+      "pixelY": 895,
+      "source": "Współrzędne przekazane przez użytkownika przez Locus Map",
+      "accuracyMeters": null,
+      "status": "terenowo wskazana kotwica; dokładność odbiornika nieznana"
+    }
+  ],
+  "interpretation": "Punkt obok obiektu na rysunku jest traktowany jako wejście lub punkt dostępu, a nie geometryczny środek obozu lub strefy."
+}

@@ -1,0 +1,6 @@
+Ptasie Obserwacje v0.9.3
+
+Ta wersja zawiera tylko obserwacje ptaków: lista 5 wpisów, mapa obserwacji, dodawanie obserwacji, filtry gatunków.
+
+Pakiet Android: pl.bartoszlawicki.ptasie_obserwacje
+Źródło: rozdzielone z Ptasiej Mapy. Osobny identyfikator Android i stały podpis aktualizacji.

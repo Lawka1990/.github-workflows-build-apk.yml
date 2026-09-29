@@ -1,0 +1,27 @@
+plugins {
+    id 'com.android.application'
+}
+
+def ciRunNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'pl.bartoszlawicki.zglosobraczke'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'pl.bartoszlawicki.zglosobraczke'
+        minSdk 23
+        targetSdk 36
+        versionCode = 1000000 + ciRunNumber
+        versionName = "1.0.${ciRunNumber}"
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+}
