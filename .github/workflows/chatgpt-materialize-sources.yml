@@ -1,0 +1,143 @@
+name: ChatGPT - materialize app sources
+
+on:
+  push:
+    branches:
+      - chatgpt/full-apps-review-2026-09-29
+    paths:
+      - ".github/workflows/chatgpt-materialize-sources.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout review branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: chatgpt/full-apps-review-2026-09-29
+
+      - name: Materialize Flutter ZIP projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf apps
+          mkdir -p apps/ptasie-budki apps/ptasie-obserwacje apps/grunwald
+          unzip -q PTASIE_BUDKI_v093.zip -d apps/ptasie-budki
+          unzip -q PTASIE_OBSERWACJE_v093.zip -d apps/ptasie-obserwacje
+          unzip -q GRUNWALD_2026_V12.zip -d apps/grunwald
+
+          normalize_root () {
+            local dir="$1"
+            if [[ ! -f "$dir/pubspec.yaml" ]]; then
+              local root
+              root="$(find "$dir" -mindepth 1 -maxdepth 2 -type f -name pubspec.yaml -printf '%h\n' | head -n1)"
+              if [[ -n "$root" && "$root" != "$dir" ]]; then
+                tmp="$(mktemp -d)"
+                cp -a "$root"/. "$tmp"/
+                rm -rf "$dir"
+                mkdir -p "$dir"
+                cp -a "$tmp"/. "$dir"/
+                rm -rf "$tmp"
+              fi
+            fi
+          }
+          normalize_root apps/ptasie-budki
+          normalize_root apps/ptasie-obserwacje
+          normalize_root apps/grunwald
+
+      - name: Copy current Lowca Mieszkan V4 sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin lowca-mieszkan-v4
+          git archive FETCH_HEAD lowca_mieszkan_v4 | tar -x
+          mv lowca_mieszkan_v4 apps/lowca-mieszkan
+
+      - name: Materialize Zglos obraczke source from workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p apps/zglos-obraczke
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          src = Path('.github/workflows/release-google-play.yml').read_text(encoding='utf-8').splitlines()
+          dest_root = Path('apps/zglos-obraczke')
+          i = 0
+          count = 0
+          pat = re.compile(r"^\s*cat > ([^ ]+) <<'([^']+)'\s*$")
+          while i < len(src):
+              m = pat.match(src[i])
+              if not m:
+                  i += 1
+                  continue
+              rel, marker = m.groups()
+              if rel.startswith('/'):
+                  i += 1
+                  continue
+              base_indent = len(src[i]) - len(src[i].lstrip())
+              body = []
+              i += 1
+              while i < len(src):
+                  raw = src[i]
+                  stripped = raw[base_indent:] if len(raw) >= base_indent else raw.lstrip()
+                  if stripped.strip() == marker:
+                      break
+                  body.append(stripped)
+                  i += 1
+              out = dest_root / rel
+              out.parent.mkdir(parents=True, exist_ok=True)
+              out.write_text("\n".join(body) + "\n", encoding='utf-8')
+              count += 1
+              i += 1
+          if count < 8:
+              raise SystemExit(f'Extracted too few files: {count}')
+          print(f'Extracted {count} generated source files')
+          PY
+
+          cp PRIVACY_POLICY.md apps/zglos-obraczke/PRIVACY_POLICY.md
+          cp PLAY_STORE_CHECKLIST.md apps/zglos-obraczke/PLAY_STORE_CHECKLIST.md
+
+      - name: Remove generated/binary noise
+        shell: bash
+        run: |
+          set -euo pipefail
+          find apps -type d \( -name build -o -name .dart_tool -o -name .gradle \) -prune -exec rm -rf {} +
+          find apps -type f \( -name '*.apk' -o -name '*.aab' -o -name '*.idsig' \) -delete
+
+      - name: Add source inventory
+        shell: bash
+        run: |
+          cat > apps/README.md <<'EOF'
+          # Aplikacje - zmaterializowane źródła
+
+          Ten katalog zawiera normalne, przeglądalne źródła aplikacji, które wcześniej były przechowywane głównie jako ZIP-y albo generowane wewnątrz workflow GitHub Actions.
+
+          - `zglos-obraczke` - aplikacja Android do zgłaszania zaobrączkowanych ptaków.
+          - `ptasie-budki` - aplikacja Flutter/Supabase do budek lęgowych.
+          - `ptasie-obserwacje` - aplikacja Flutter/Supabase do obserwacji ptaków.
+          - `grunwald` - aplikacja Flutter Grunwald 2026.
+          - `lowca-mieszkan` - aplikacja Flutter Łowca Mieszkań V4.
+
+          Źródłem prawdy po przeglądzie powinny być katalogi `apps/*`, a nie archiwa ZIP ani kod osadzony w plikach workflow.
+          EOF
+
+      - name: Commit materialized sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "chatgpt-review-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add apps
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: materialize application sources for full review"
+          git push origin HEAD:chatgpt/full-apps-review-2026-09-29
