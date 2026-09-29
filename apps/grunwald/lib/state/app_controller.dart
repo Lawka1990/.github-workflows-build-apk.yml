@@ -82,12 +82,16 @@ class AppController extends ChangeNotifier {
             ? overridden
             : overridden.copyWith(x: saved.x, y: saved.y);
       }),
-      ...customPlaces.where((place) => !_sourcePlaces.any(
-            (source) => source.id == place.id,
-          )).map((place) {
-        final saved = positions[place.id];
-        return saved == null ? place : place.copyWith(x: saved.x, y: saved.y);
-      }),
+      ...customPlaces
+          .where(
+            (place) => !_sourcePlaces.any(
+              (source) => source.id == place.id,
+            ),
+          )
+          .map((place) {
+            final saved = positions[place.id];
+            return saved == null ? place : place.copyWith(x: saved.x, y: saved.y);
+          }),
     ];
     notifyListeners();
   }
