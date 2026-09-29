@@ -1048,7 +1048,7 @@ class AppState extends ChangeNotifier {
           behaviour: d.behaviour,
           notes: d.notes,
           sensitive: d.sensitive,
-          hiddenFromUsers: false,
+          hiddenFromUsers: d.sensitive,
           deleted: false,
           ownerId: 'clanga',
           ownerEmail: 'Clanga.com',
