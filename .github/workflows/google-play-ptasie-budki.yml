@@ -2,11 +2,6 @@ name: Google Play - Ptasie Budki v0.9.6
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/google-play-ptasie-budki.yml"
 
 concurrency:
   group: release-ptasie-budki
@@ -168,28 +163,3 @@ jobs:
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Zapisz potwierdzenie gotowego wydania
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          git reset --hard origin/main
-          mkdir -p build-status
-          printf '%s' 'Ptasie Budki v0.9.6
-status=SUCCESS
-apk=ptasie-budki-v096.apk
-aab=ptasie-budki-v096.aab
-tag=ptasie_budki-v0.9.6
-run=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-commit=${GITHUB_SHA}
-' > build-status/ptasie-budki.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add build-status/ptasie-budki.txt
-          git commit -m 'Potwierdź gotowy build: ptasie-budki.txt'
-          for i in 1 2 3 4 5; do
-            if git push origin HEAD:main; then exit 0; fi
-            git pull --rebase origin main
-          done
-          exit 1
