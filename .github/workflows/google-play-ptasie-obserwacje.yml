@@ -2,6 +2,15 @@ name: Google Play - Ptasie Obserwacje v0.9.9
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/google-play-ptasie-obserwacje.yml"
+
+concurrency:
+  group: release-ptasie-obserwacje
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -161,3 +170,28 @@ jobs:
           files: release/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Zapisz potwierdzenie gotowego wydania
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+          mkdir -p build-status
+          printf '%s' 'Ptasie Obserwacje v0.9.9
+status=SUCCESS
+apk=ptasie-obserwacje-v099.apk
+aab=ptasie-obserwacje-v099.aab
+tag=ptasie_obserwacje-v0.9.9
+run=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+commit=${GITHUB_SHA}
+' > build-status/ptasie-obserwacje.txt
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add build-status/ptasie-obserwacje.txt
+          git commit -m 'Potwierdź gotowy build: ptasie-obserwacje.txt'
+          for i in 1 2 3 4 5; do
+            if git push origin HEAD:main; then exit 0; fi
+            git pull --rebase origin main
+          done
+          exit 1
