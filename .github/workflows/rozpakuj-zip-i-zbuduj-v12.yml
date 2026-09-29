@@ -2,11 +2,6 @@ name: Zbuduj Grunwald 2026 V12
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/rozpakuj-zip-i-zbuduj-v12.yml"
 
 permissions:
   contents: write
@@ -112,28 +107,3 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --title "Grunwald 2026 V12 — build ${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" \
             --notes "V12: prowadzenie po drogach, czytelniejsza mapa, filtry, wyszukiwanie miejsc, ulubione wydarzenia i rozbudowana administracja."
-
-      - name: Zapisz potwierdzenie gotowego wydania
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main
-          git reset --hard origin/main
-          mkdir -p build-status
-          printf '%s' 'Grunwald 2026 V12
-status=SUCCESS
-apk=Grunwald_2026_V12.apk
-aab=Grunwald_2026_V12.aab
-tag=v0.12.0-build-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}
-run=https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
-commit=${GITHUB_SHA}
-' > build-status/grunwald.txt
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add build-status/grunwald.txt
-          git commit -m 'Potwierdź gotowy build: grunwald.txt'
-          for i in 1 2 3 4 5; do
-            if git push origin HEAD:main; then exit 0; fi
-            git pull --rebase origin main
-          done
-          exit 1
