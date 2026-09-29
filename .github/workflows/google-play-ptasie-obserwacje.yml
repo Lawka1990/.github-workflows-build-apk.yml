@@ -2,11 +2,6 @@ name: Google Play - Ptasie Obserwacje v0.9.9
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/google-play-ptasie-obserwacje.yml"
 
 permissions:
   contents: write
