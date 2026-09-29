@@ -66,24 +66,6 @@ drop policy if exists "profiles all anon authenticated" on public.app_profiles;
 drop policy if exists "nest sites all anon authenticated" on public.nest_sites;
 drop policy if exists "inspections all anon authenticated" on public.inspections;
 
-create policy "profiles all anon authenticated"
-on public.app_profiles for all
-to anon, authenticated
-using (true)
-with check (true);
-
-create policy "nest sites all anon authenticated"
-on public.nest_sites for all
-to anon, authenticated
-using (true)
-with check (true);
-
-create policy "inspections all anon authenticated"
-on public.inspections for all
-to anon, authenticated
-using (true)
-with check (true);
-
 create index if not exists nest_sites_owner_idx on public.nest_sites(owner_id);
 create index if not exists nest_sites_updated_idx on public.nest_sites(updated_at desc);
 create index if not exists inspections_site_idx on public.inspections(nest_site_id);
@@ -137,22 +119,10 @@ drop policy if exists "bird observations all anon authenticated" on public.bird_
 drop policy if exists "bird sensitive species read anon authenticated" on public.bird_sensitive_species;
 drop policy if exists "bird sensitive species write authenticated" on public.bird_sensitive_species;
 
-create policy "bird observations all anon authenticated"
-on public.bird_observations for all
-to anon, authenticated
-using (true)
-with check (true);
-
 create policy "bird sensitive species read anon authenticated"
 on public.bird_sensitive_species for select
 to anon, authenticated
 using (true);
-
-create policy "bird sensitive species write authenticated"
-on public.bird_sensitive_species for all
-to authenticated
-using (true)
-with check (true);
 
 insert into public.bird_sensitive_species (species, latin_name, hide_exact_location, blur_radius_m, notes)
 values
@@ -669,3 +639,61 @@ on conflict (species) do update set
   hide_exact_location = excluded.hide_exact_location,
   blur_radius_m = excluded.blur_radius_m,
   notes = excluded.notes;
+
+
+-- Never store account e-mail addresses in publicly readable map records.
+-- owner_id remains the authorization key; owner_email is retained as a legacy
+-- display-label column for compatibility with already released clients.
+
+create or replace function app_private.sanitize_public_owner_label()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if lower(trim(coalesce(new.owner_email, ''))) = 'clanga.com' then
+    new.owner_email := 'Clanga.com';
+  elsif (select auth.uid()) is not null then
+    new.owner_email := case
+      when app_private.is_app_admin() then 'Administrator'
+      else 'Użytkownik'
+    end;
+  elsif position('@' in coalesce(new.owner_email, '')) > 0 then
+    new.owner_email := 'Gość';
+  end if;
+  return new;
+end
+$$;
+
+drop trigger if exists trg_sanitize_nest_site_owner_label on public.nest_sites;
+create trigger trg_sanitize_nest_site_owner_label
+before insert or update on public.nest_sites
+for each row execute function app_private.sanitize_public_owner_label();
+
+drop trigger if exists trg_sanitize_inspection_owner_label on public.inspections;
+create trigger trg_sanitize_inspection_owner_label
+before insert or update on public.inspections
+for each row execute function app_private.sanitize_public_owner_label();
+
+drop trigger if exists trg_sanitize_bird_observation_owner_label on public.bird_observations;
+create trigger trg_sanitize_bird_observation_owner_label
+before insert or update on public.bird_observations
+for each row execute function app_private.sanitize_public_owner_label();
+
+update public.nest_sites
+set owner_email = case
+  when lower(trim(owner_email)) = 'clanga.com' then 'Clanga.com'
+  else 'Użytkownik'
+end
+where position('@' in owner_email) > 0;
+
+update public.inspections
+set owner_email = 'Użytkownik'
+where position('@' in owner_email) > 0;
+
+update public.bird_observations
+set owner_email = case
+  when lower(trim(owner_email)) = 'clanga.com' then 'Clanga.com'
+  else 'Użytkownik'
+end
+where position('@' in owner_email) > 0;
