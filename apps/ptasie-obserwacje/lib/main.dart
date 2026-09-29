@@ -321,6 +321,7 @@ class AppState extends ChangeNotifier {
 
   SupabaseClient? get client => supabaseReady ? Supabase.instance.client : null;
   bool get loggedIn => currentUser != null;
+  String get publicOwnerLabel => loggedIn ? (isAdmin ? 'Administrator' : 'Użytkownik') : 'Gość';
   bool get isSuperAdmin => (currentUser?.email ?? '').toLowerCase() == superAdminEmail.toLowerCase();
   bool get isAdminByProfile => userRole == 'admin' || userRole == 'super_admin';
   bool get isAdmin => adminMode || isAdminByProfile || isSuperAdmin;
@@ -934,7 +935,7 @@ class AppState extends ChangeNotifier {
       notes: notes,
       photoPaths: List<String>.from(photoPaths),
       ownerId: currentUser?.id ?? localGuestId ?? 'guest',
-      ownerEmail: currentUser?.email ?? 'gość',
+      ownerEmail: publicOwnerLabel,
       reportStatus: loggedIn ? 'Zgłoszona' : 'Zgłoszona anonimowo',
       createdAt: now,
       updatedAt: now,
@@ -982,7 +983,7 @@ class AppState extends ChangeNotifier {
       hiddenFromUsers: isSensitive,
       deleted: false,
       ownerId: currentUser?.id ?? localGuestId ?? 'guest',
-      ownerEmail: currentUser?.email ?? 'gość',
+      ownerEmail: publicOwnerLabel,
       createdAt: now,
       updatedAt: now,
       locallyChanged: true,
@@ -1843,7 +1844,7 @@ class AppState extends ChangeNotifier {
         repairNeeded: false,
         notes: d.notes,
         ownerId: currentUser?.id ?? localGuestId ?? 'guest',
-        ownerEmail: currentUser?.email ?? 'gość',
+        ownerEmail: publicOwnerLabel,
         reportStatus: loggedIn ? 'Zaimportowana z GPX' : 'Zaimportowana lokalnie',
         createdAt: now,
         updatedAt: now,
@@ -7127,7 +7128,7 @@ class _AddInspectionPageState extends State<AddInspectionPage> {
                 adultsCount: int.tryParse(adults.text) ?? 0,
                 notes: notes.text,
                 ownerId: state.currentUser?.id ?? '',
-                ownerEmail: state.currentUser?.email ?? '',
+                ownerEmail: state.publicOwnerLabel,
                 locallyChanged: true,
               ));
               await state.updateSite(widget.site, markSiteChanged: false);
