@@ -723,6 +723,8 @@ public class MainActivity extends Activity {
     };
 
     private int step = 0;
+    private boolean polringAutoSubmitRequested = false;
+    private boolean polringSubmitAttempted = false;
     private Uri currentPhotoUri;
     private int replacePhotoIndex = -1;
     private final ArrayList<Uri> photoUris = new ArrayList<>();
@@ -1132,6 +1134,10 @@ public class MainActivity extends Activity {
         reports.setOnClickListener(v -> sendViaGmailWithReports());
         root.addView(reports, withTopMargin(dp(8), dp(56)));
 
+        Button directPolring = filledButton("🌐 Wyślij bezpośrednio do POLRING");
+        directPolring.setOnClickListener(v -> sendDirectToPolring());
+        root.addView(directPolring, withTopMargin(dp(10), dp(58)));
+
         Button draft = outlineButton("💾 Zapisz szkic");
         draft.setOnClickListener(v -> saveDraft());
         root.addView(draft, withTopMargin(dp(8), dp(56)));
@@ -1147,9 +1153,9 @@ public class MainActivity extends Activity {
     }
 
     private void addPolringWebScreen(LinearLayout root) {
-        LinearLayout info = card(root, "Formularz POLRING", "Strona ma własne kroki i zabezpieczenia. Aplikacja próbuje wypełnić pola po załadowaniu, a pełne zgłoszenie jest też skopiowane do schowka.");
+        LinearLayout info = card(root, "Formularz POLRING", "Aplikacja korzysta z prawdziwego formularza POLRING, automatycznie uzupełnia dane i po wybraniu wysyłki bezpośredniej uruchamia jego przycisk wysłania.");
         TextView hint = new TextView(this);
-        hint.setText("Autouzupełnianie działa teraz w kilku próbach po załadowaniu strony. Jeśli POLRING zmieni pola albo przejdzie do kolejnego kroku, kliknij „Uzupełnij ponownie”. Pełne dane są też kopiowane do schowka.");
+        hint.setText("Dane są wysyłane przez formularz ring.stornit.gda.pl, a nie przez prywatny serwer aplikacji. Jeśli strona zmieni pola lub zatrzyma wysyłkę na walidacji, formularz pozostanie widoczny i można poprawić dane oraz wysłać go ręcznie.");
         hint.setTextSize(14);
         hint.setTextColor(MUTED);
         hint.setPadding(dp(4), dp(6), dp(4), dp(8));
@@ -1179,6 +1185,39 @@ public class MainActivity extends Activity {
                 for (int delay : new int[]{600, 1400, 2600, 4200, 6500}) {
                     view.postDelayed(() -> view.evaluateJavascript(buildAutofillJs(), null), delay);
                 }
+
+                if (polringAutoSubmitRequested && !polringSubmitAttempted) {
+                    view.postDelayed(() -> {
+                        if (!polringAutoSubmitRequested || polringSubmitAttempted) return;
+                        polringSubmitAttempted = true;
+                        view.evaluateJavascript(buildPolringSubmitJs(), result -> {
+                            String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                            if (normalized.startsWith("CLICKED")) {
+                                Toast.makeText(MainActivity.this,
+                                        "Formularz POLRING został przekazany do wysłania. Sprawdzam odpowiedź serwera…",
+                                        Toast.LENGTH_LONG).show();
+                            } else {
+                                Toast.makeText(MainActivity.this,
+                                        "Nie udało się automatycznie uruchomić wysyłki. Formularz jest wypełniony — sprawdź go i wyślij ręcznie.",
+                                        Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }, 7600);
+                } else if (polringSubmitAttempted) {
+                    view.postDelayed(() -> view.evaluateJavascript(buildPolringResultJs(), result -> {
+                        String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                        if ("SUCCESS".equals(normalized)) {
+                            polringAutoSubmitRequested = false;
+                            Toast.makeText(MainActivity.this,
+                                    "POLRING potwierdził przyjęcie zgłoszenia.",
+                                    Toast.LENGTH_LONG).show();
+                        } else if ("ERROR".equals(normalized)) {
+                            Toast.makeText(MainActivity.this,
+                                    "POLRING zwrócił błąd lub wymaga uzupełnienia pól. Popraw dane w formularzu i wyślij ponownie.",
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    }), 1200);
+                }
             }
         });
         Button retryFill = filledButton("Uzupełnij ponownie formularz");
@@ -1189,6 +1228,21 @@ public class MainActivity extends Activity {
             Toast.makeText(this, "Ponowiono autouzupełnianie i skopiowano dane do schowka", Toast.LENGTH_LONG).show();
         });
         info.addView(retryFill, withTopMargin(dp(8), dp(52)));
+
+        Button submitNow = filledButton("🚀 Wyślij teraz do POLRING");
+        submitNow.setOnClickListener(v -> {
+            polringAutoSubmitRequested = false;
+            polringSubmitAttempted = true;
+            web.evaluateJavascript(buildPolringSubmitJs(), result -> {
+                String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                if (!normalized.startsWith("CLICKED")) {
+                    Toast.makeText(this,
+                            "Nie znaleziono przycisku wysłania na stronie. Przewiń formularz i użyj przycisku POLRING ręcznie.",
+                            Toast.LENGTH_LONG).show();
+                }
+            });
+        });
+        info.addView(submitNow, withTopMargin(dp(8), dp(54)));
 
         web.loadUrl(POLRING_FORM);
         root.addView(web, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(620)));
@@ -1811,11 +1865,24 @@ public class MainActivity extends Activity {
         catch (ActivityNotFoundException e) { Toast.makeText(this, "Brak aplikacji map", Toast.LENGTH_LONG).show(); }
     }
 
+    private void sendDirectToPolring() {
+        updateModelFromFields();
+        if (!validateBeforeSend(false)) return;
+        saveDraft();
+        copyReportToClipboard();
+        polringAutoSubmitRequested = true;
+        polringSubmitAttempted = false;
+        step = 3;
+        render();
+    }
+
     private void openPolringForm() {
         updateModelFromFields();
         if (!validateBeforeSend(false)) return;
         saveDraft();
         copyReportToClipboard();
+        polringAutoSubmitRequested = false;
+        polringSubmitAttempted = false;
         step = 3;
         render();
     }
@@ -2889,6 +2956,38 @@ public class MainActivity extends Activity {
                 "console.log('Zgłoś obrączkę: wypełniono pól: '+filled); return filled;" +
                 "}" +
                 "tryFill(); let tries=0; const timer=setInterval(()=>{tries++; tryFill(); if(tries>8) clearInterval(timer);},900);" +
+                "})();";
+    }
+
+    private String buildPolringSubmitJs() {
+        return "(function(){" +
+                "function n(s){return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();}" +
+                "function label(el){return n([el.value,el.innerText,el.textContent,el.name,el.id,el.title,el.getAttribute('aria-label')].join(' '));}" +
+                "const good=['wyslij','przeslij','zapisz','dodaj stwierdzenie','zatwierdz','submit','send','save'];" +
+                "const bad=['anuluj','wstecz','usun','wyloguj','logowanie','rejestr','mapa','pokaz','szukaj','reset'];" +
+                "let best=null,bestScore=-9999;" +
+                "for(const el of document.querySelectorAll('input[type=submit],button,input[type=button],a')){" +
+                " const t=label(el); if(!t) continue; let score=0;" +
+                " for(const k of good) if(t.includes(n(k))) score+=20;" +
+                " for(const k of bad) if(t.includes(n(k))) score-=50;" +
+                " if(el.type==='submit') score+=8;" +
+                " if((el.getAttribute('onclick')||'').includes('__doPostBack')) score+=5;" +
+                " score += Math.min(8, Math.floor((el.getBoundingClientRect().top + window.scrollY) / Math.max(1, document.body.scrollHeight) * 8));" +
+                " if(score>bestScore){best=el;bestScore=score;}" +
+                "}" +
+                "if(best && bestScore>0){best.scrollIntoView({block:'center'}); best.click(); return 'CLICKED:'+label(best);}" +
+                "const form=document.querySelector('form');" +
+                "if(form){try{if(form.requestSubmit){form.requestSubmit();return 'CLICKED:requestSubmit';}}catch(e){}}" +
+                "return 'NO_SUBMIT';" +
+                "})();";
+    }
+
+    private String buildPolringResultJs() {
+        return "(function(){" +
+                "const t=(document.body&&document.body.innerText?document.body.innerText:'').toLowerCase();" +
+                "if(/dziekuj|dziękuj|przyjet|przyjęt|zapisano|zgloszenie zostalo|zgłoszenie zostało|stwierdzenie zostalo|stwierdzenie zostało/.test(t)) return 'SUCCESS';" +
+                "if(/blad|błąd|wymagane pole|pole wymagane|uzupelnij|uzupełnij|niepopraw/.test(t)) return 'ERROR';" +
+                "return 'UNKNOWN';" +
                 "})();";
     }
 
