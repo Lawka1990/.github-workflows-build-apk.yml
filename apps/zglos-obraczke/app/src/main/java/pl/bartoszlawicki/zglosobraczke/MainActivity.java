@@ -1191,7 +1191,7 @@ public class MainActivity extends Activity {
                         if (!polringAutoSubmitRequested || polringSubmitAttempted) return;
                         polringSubmitAttempted = true;
                         view.evaluateJavascript(buildPolringSubmitJs(), result -> {
-                            String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                            String normalized = result == null ? "" : result.replace("\"", "");
                             if (normalized.startsWith("CLICKED")) {
                                 Toast.makeText(MainActivity.this,
                                         "Formularz POLRING został przekazany do wysłania. Sprawdzam odpowiedź serwera…",
@@ -1205,7 +1205,7 @@ public class MainActivity extends Activity {
                     }, 7600);
                 } else if (polringSubmitAttempted) {
                     view.postDelayed(() -> view.evaluateJavascript(buildPolringResultJs(), result -> {
-                        String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                        String normalized = result == null ? "" : result.replace("\"", "");
                         if ("SUCCESS".equals(normalized)) {
                             polringAutoSubmitRequested = false;
                             Toast.makeText(MainActivity.this,
@@ -1234,7 +1234,7 @@ public class MainActivity extends Activity {
             polringAutoSubmitRequested = false;
             polringSubmitAttempted = true;
             web.evaluateJavascript(buildPolringSubmitJs(), result -> {
-                String normalized = result == null ? "" : result.replace("\"", "").replace(""", "");
+                String normalized = result == null ? "" : result.replace("\"", "");
                 if (!normalized.startsWith("CLICKED")) {
                     Toast.makeText(this,
                             "Nie znaleziono przycisku wysłania na stronie. Przewiń formularz i użyj przycisku POLRING ręcznie.",
