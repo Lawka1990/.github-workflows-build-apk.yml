@@ -3,11 +3,6 @@ run-name: Zgłoś obrączkę — APK testowy i podpisany AAB v27
 
 'on':
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/release-google-play.yml"
 
 concurrency:
   group: zglos-obraczke-google-play-${{ github.ref }}
