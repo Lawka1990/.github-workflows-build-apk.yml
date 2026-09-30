@@ -3,6 +3,11 @@ run-name: Zgłoś obrączkę — APK testowy i podpisany AAB v27
 
 'on':
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release-google-play.yml"
 
 concurrency:
   group: zglos-obraczke-google-play-${{ github.ref }}
@@ -142,35 +147,48 @@ jobs:
 
           echo "apply from: rootProject.file('signing.gradle')" >> app/build.gradle
 
-      - name: Zbuduj podpisany AAB dla Google Play
+      - name: Zbuduj podpisany APK i AAB
         shell: bash
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: gradle :app:bundleRelease --no-daemon --stacktrace
+        run: |
+          gradle :app:assembleRelease --no-daemon --stacktrace
+          gradle :app:bundleRelease --no-daemon --stacktrace
 
-      - name: Sprawdź i przygotuj AAB
+      - name: Sprawdź i przygotuj APK oraz AAB
         shell: bash
         run: |
           set -euo pipefail
 
+          APK_FILE="$(find app/build/outputs/apk/release -name '*.apk' -print -quit)"
           AAB_FILE="$(find app/build/outputs/bundle/release -name '*.aab' -print -quit)"
-          if [ -z "$AAB_FILE" ]; then
-            echo "::error::Nie znaleziono wynikowego pliku AAB."
+          if [ -z "$APK_FILE" ] || [ -z "$AAB_FILE" ]; then
+            echo "::error::Nie znaleziono wynikowego APK lub AAB."
             exit 1
           fi
 
           mkdir -p release
+          cp "$APK_FILE" "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.apk"
           cp "$AAB_FILE" "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.aab"
+
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.apk"
           jarsigner -verify "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.aab"
+
+          sha256sum "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.apk" > "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.apk.sha256"
           sha256sum "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.aab" > "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.aab.sha256"
+
+          "$BUILD_TOOLS/aapt" dump badging "release/ZglosObraczke-v27-${GITHUB_RUN_NUMBER}.apk" | tee /tmp/zglos-badging.txt
+          grep -q "package: name='pl.bartoszlawicki.zglosobraczke'" /tmp/zglos-badging.txt
+          grep -q "targetSdkVersion:'36'" /tmp/zglos-badging.txt
 
           echo "Pakiet: pl.bartoszlawicki.zglosobraczke"
           echo "versionCode: $((1000000 + GITHUB_RUN_NUMBER))"
           ls -lh release
 
-      - name: Zapisz podpisany AAB dla Google Play
+      - name: Zapisz podpisany APK i AAB
         uses: actions/upload-artifact@v7
         with:
           name: ZglosObraczke-v27-Google-Play
