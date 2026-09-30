@@ -1,6 +1,12 @@
-# Zgłoś obrączkę Android — v27
+# Zgłoś obrączkę Android — v28
 
-Zmiany w v27:
+Zmiany w v28:
+
+- v28: dodano bezpośrednią wysyłkę do POLRING przez prawdziwy formularz ring.stornit.gda.pl; aplikacja autouzupełnia formularz, zaznacza zgody i uruchamia jego wysłanie po użyciu przycisku „Wyślij bezpośrednio do POLRING”,
+- v28: pozostawiono widoczny formularz jako bezpieczny fallback, gdy POLRING zmieni walidację lub układ pól,
+- v28: Gmail + Word/PDF/CSV/XLSX pozostaje alternatywną metodą wysyłki.
+
+Poprzednie zmiany v27:
 
 - poprawiono błąd kompilacji w regexie wyboru godziny,
 - poprawiono walidację e-maila przez Android Patterns.EMAIL_ADDRESS,
