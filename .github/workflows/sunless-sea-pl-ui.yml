@@ -1,0 +1,29 @@
+name: Sunless Sea PL UI extraction
+on:
+  push:
+    paths:
+      - ".github/workflows/sunless-sea-pl-ui.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runtime
+        run: pip install "ctranslate2>=4.6,<5" "sentencepiece>=0.2,<1" "huggingface_hub>=0.27,<2" "rapidfuzz>=3.9,<4"
+      - name: Fetch UI localization reference
+        run: git clone --depth 1 https://github.com/tinygrox/SunlessSeaCN.git /tmp/sscn
+      - name: Extract and translate UI strings
+        run: python .github/scripts/sunless_sea_ui_translate.py
+      - name: Upload UI translation
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunless-sea-pl-ui
+          path: sunless_sea_ui_pl/
+          retention-days: 7
