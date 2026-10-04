@@ -223,15 +223,28 @@ def load_ct2(repo_id):
     return tr, src, tgt
 
 def translate_batch(texts, tr, src_sp, tgt_sp, beam=2):
-    encoded = [src_sp.encode(t, out_type=str) for t in texts]
+    # Marian models have a hard encoder-position limit. Split by ACTUAL
+    # SentencePiece tokens, not characters, then reassemble in input order.
+    flat = []
+    owners = []
+    for i, t in enumerate(texts):
+        toks = src_sp.encode(t, out_type=str)
+        if not toks:
+            toks = src_sp.encode(" ", out_type=str)
+        for j in range(0, len(toks), 380):
+            flat.append(toks[j:j+380])
+            owners.append(i)
     results = tr.translate_batch(
-        encoded,
+        flat,
         beam_size=beam,
         max_decoding_length=600,
         repetition_penalty=1.08,
         max_batch_size=64,
     )
-    return [tgt_sp.decode(r.hypotheses[0]).strip() for r in results]
+    pieces = [[] for _ in texts]
+    for owner, r in zip(owners, results):
+        pieces[owner].append(tgt_sp.decode(r.hypotheses[0]).strip())
+    return [" ".join(p for p in arr if p).strip() for arr in pieces]
 
 def norm_similarity(a, b):
     def n(s):
