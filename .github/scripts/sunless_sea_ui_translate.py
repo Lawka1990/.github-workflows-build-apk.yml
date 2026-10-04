@@ -49,7 +49,7 @@ def tb(texts,tr,src,tgt,beam=3):
     for i,t in enumerate(texts):
       toks=src.encode(t,out_type=str) or src.encode(" ",out_type=str)
       for j in range(0,len(toks),380): flat.append(toks[j:j+380]); own.append(i)
-    rr=tr.translate_batch(flat,beam_size=beam,max_decoding_length=600,max_batch_size=64)
+    rr=tr.translate_batch(flat,beam_size=beam,max_decoding_length=460,repetition_penalty=1.10,max_batch_size=64)
     parts=[[] for _ in texts]
     for i,r in zip(own,rr): parts[i].append(tgt.decode(r.hypotheses[0]).strip())
     return [" ".join(a).strip() for a in parts]
