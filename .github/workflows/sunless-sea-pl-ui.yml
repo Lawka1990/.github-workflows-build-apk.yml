@@ -27,3 +27,4 @@ jobs:
           name: sunless-sea-pl-ui
           path: sunless_sea_ui_pl/
           retention-days: 7
+# ui-run-decoder-safe
