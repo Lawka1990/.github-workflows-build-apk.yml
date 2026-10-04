@@ -237,7 +237,7 @@ def translate_batch(texts, tr, src_sp, tgt_sp, beam=2):
     results = tr.translate_batch(
         flat,
         beam_size=beam,
-        max_decoding_length=600,
+        max_decoding_length=460,
         repetition_penalty=1.08,
         max_batch_size=64,
     )
