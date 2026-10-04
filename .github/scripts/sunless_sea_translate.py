@@ -276,16 +276,22 @@ def english_fraction(s):
 def main():
     docs = {}
     source_hashes = {}
+    failed_sources = {}
     contexts = defaultdict(list)
     types = defaultdict(set)
     for rel in FILES:
-        p = download(rel)
-        source_hashes[rel] = sha256(p)
-        doc = json.loads(p.read_text(encoding="utf-8-sig"))
+        try:
+            p = download(rel)
+            source_hashes[rel] = sha256(p)
+            doc = json.loads(p.read_text(encoding="utf-8-sig"))
+        except Exception as e:
+            failed_sources[rel] = str(e)
+            print(f"SKIP INVALID SOURCE {rel}: {e}")
+            continue
         docs[rel] = doc
-        for typ, s, r, path in walk(doc, rel):
-            contexts[s].append({"file": r, "path": path, "type": typ})
-            types[s].add(typ)
+        for typ, src_text, r, path in walk(doc, rel):
+            contexts[src_text].append({"file": r, "path": path, "type": typ})
+            types[src_text].add(typ)
 
     strings = sorted(contexts, key=lambda x: (len(x), x))
     print(f"UNIQUE SOURCE STRINGS: {len(strings)}")
@@ -466,6 +472,7 @@ def main():
         "suspicious_segments_retried": len(retry_indices),
         "translation_memory_entries": len(tm),
         "source_hashes": source_hashes,
+        "failed_sources": failed_sources,
         "model_en_pl": "rohanksaxena/opus-mt-en-pl",
         "model_pl_en": "rohanksaxena/opus-mt-pl-en",
     }
