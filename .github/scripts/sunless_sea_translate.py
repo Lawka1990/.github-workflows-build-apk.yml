@@ -271,6 +271,28 @@ def english_fraction(s):
     hits = sum(1 for w in words if w in EN_COMMON)
     return hits / len(words)
 
+
+def extract_fields_from_malformed_json(text, rel):
+    """Recover quoted player-facing strings from a malformed mirror file."""
+    wanted = set(SAFE_FIELDS) | UI_NAME_FIELDS
+    pat = re.compile(r'"([^"\\]+)"\\s*:\\s*("(?:\\\\.|[^"\\\\])*")')
+    for m in pat.finditer(text):
+        key = m.group(1)
+        if key not in wanted:
+            continue
+        try:
+            value = json.loads(m.group(2))
+        except Exception:
+            continue
+        if not visible_text(value):
+            continue
+        safe = key in SAFE_FIELDS or (key == "Name" and rel in SAFE_NAME_FILES)
+        ui_name = key in UI_NAME_FIELDS and looks_human_name(value)
+        if safe:
+            yield ("safe", value, rel, f"regex/{m.start()}/{key}")
+        if ui_name:
+            yield ("ui", value, rel, f"regex/{m.start()}/{key}")
+
 def main():
     docs = {}
     source_hashes = {}
