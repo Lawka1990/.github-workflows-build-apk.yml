@@ -85,8 +85,6 @@ def download(rel):
             r = requests.get(u, timeout=90)
             r.raise_for_status()
             dst.write_bytes(r.content)
-            # Validate JSON immediately.
-            json.loads(dst.read_text(encoding="utf-8-sig"))
             print(f"DOWNLOADED {rel} {len(r.content)} bytes")
             return dst
         except Exception as e:
@@ -283,13 +281,20 @@ def main():
         try:
             p = download(rel)
             source_hashes[rel] = sha256(p)
-            doc = json.loads(p.read_text(encoding="utf-8-sig"))
         except Exception as e:
             failed_sources[rel] = str(e)
-            print(f"SKIP INVALID SOURCE {rel}: {e}")
+            print(f"SKIP UNAVAILABLE SOURCE {rel}: {e}")
             continue
-        docs[rel] = doc
-        for typ, src_text, r, path in walk(doc, rel):
+        raw_text = p.read_text(encoding="utf-8-sig", errors="replace")
+        try:
+            doc = json.loads(raw_text)
+            docs[rel] = doc
+            recovered = walk(doc, rel)
+        except Exception as e:
+            failed_sources[rel] = "malformed mirror; regex recovery used: " + str(e)
+            print(f"MALFORMED MIRROR {rel}; recovering text fields with regex: {e}")
+            recovered = extract_fields_from_malformed_json(raw_text, rel)
+        for typ, src_text, r, path in recovered:
             contexts[src_text].append({"file": r, "path": path, "type": typ})
             types[src_text].add(typ)
 
