@@ -31,8 +31,4 @@ jobs:
           path: sunless_sea_pl_build/
           compression-level: 9
           retention-days: 7
-
-# source-mirror-run-2
-
-# resilient-source-run-3
-\n# malformed-json-recovery-run-4\n
+# final-full-run
