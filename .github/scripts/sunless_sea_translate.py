@@ -13,19 +13,16 @@ SRC = OUT / "source"
 OUT.mkdir(exist_ok=True)
 SRC.mkdir(exist_ok=True)
 
-BASE = "https://data.sunlesssetup.storynexus.com.s3.amazonaws.com/json/"
+BASE = "https://raw.githubusercontent.com/Enneagon/SunlessSeaRewritten/master/Sunless%20Sea%20Rewritten/"
 FILES = [
     "entities/events.json",
     "entities/qualities.json",
     "entities/exchanges.json",
     "entities/areas.json",
-    "entities/personas.json",
-    "encyclopaedia/Tutorials.json",
     "encyclopaedia/SpawnedEntities.json",
     "encyclopaedia/CombatItems.json",
     "encyclopaedia/CombatAttacks.json",
     "encyclopaedia/Associations.json",
-    "encyclopaedia/Flavours.json",
     "geography/Tiles.json",
     "geography/TileRules.json",
     "geography/TileSets.json",
@@ -46,7 +43,7 @@ SAFE_NAME_FILES = {
 UI_NAME_FIELDS = {"Name"}
 
 TECH_TOKEN = re.compile(
-    r"(\[[A-Z][A-Z0-9_]*\]|\[[qd]:[^\]]+\]|<[^>]+>|\{[^{}]+\})"
+    r"(\[[A-Z][A-Z0-9_]*\]|\[[qd]:[^\]]+\]|<[^>]+>|\{[^{}]+\}|¤¤P\d+¤¤)"
 )
 WORD_RE = re.compile(r"[A-Za-zÀ-ž]+")
 EN_COMMON = set("the a an and or but if then this that these those is are was were be been being to of in on at from for with without by as it its you your we our they their he she his her not no yes can could will would should may might do does did have has had".split())
