@@ -171,7 +171,7 @@ def split_technical(text):
         parts.append(("text", text[last:]))
     return parts or [("text", text)]
 
-def split_long_text(text, max_chars=1200):
+def split_long_text(text, max_chars=420):
     if len(text) <= max_chars:
         return [text]
     chunks = []
