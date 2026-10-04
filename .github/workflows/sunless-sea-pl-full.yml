@@ -1,0 +1,34 @@
+name: Sunless Sea PL full translation
+
+on:
+  push:
+    paths:
+      - ".github/workflows/sunless-sea-pl-full.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install translator runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install "ctranslate2>=4.6,<5" "sentencepiece>=0.2,<1" "huggingface_hub>=0.27,<2" "requests>=2.32,<3" "rapidfuzz>=3.9,<4"
+      - name: Translate and semantic-QA the corpus
+        run: python .github/scripts/sunless_sea_translate.py
+      - name: Upload translation memory and QA
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunless-sea-pl-full
+          path: sunless_sea_pl_build/
+          compression-level: 9
+          retention-days: 7
