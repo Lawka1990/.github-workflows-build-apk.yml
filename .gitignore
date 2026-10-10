@@ -1,0 +1,16 @@
+# APK i AAB publikuj przez GitHub Actions/Releases, nie commituj
+*.apk
+*.aab
+*.ipa
+*.keystore
+*.jks
+*.key
+**/key.properties
+**/local.properties
+**/.dart_tool/
+**/build/
+**/node_modules/
+**/.env
+!**/.env.example
+*.log
+.DS_Store
