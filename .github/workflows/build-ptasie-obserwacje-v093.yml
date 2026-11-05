@@ -234,7 +234,7 @@ jobs:
             /tmp/ptasie-logcat.txt
             /tmp/ptasie-badging.txt
           if-no-files-found: ignore
-          retention-days: 30
+          retention-days: 7
 
       - name: Zapisz APK
         uses: actions/upload-artifact@v4
@@ -242,7 +242,7 @@ jobs:
           name: Ptasie-Obserwacje-v098
           path: release/*
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 14
 
       - name: Utwórz wydanie
         uses: softprops/action-gh-release@v2
