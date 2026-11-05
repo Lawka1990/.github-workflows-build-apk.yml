@@ -125,3 +125,4 @@ jobs:
           name: lowca-mieszkan-v2.0.1
           path: lowca_mieszkan_artifacts/*
           if-no-files-found: error
+          retention-days: 7
