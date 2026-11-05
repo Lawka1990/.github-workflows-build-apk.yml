@@ -90,7 +90,7 @@ jobs:
           name: Grunwald-2026-V12
           path: ${{ steps.project.outputs.dir }}/release/*
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 14
 
       - name: Opublikuj w Releases
         working-directory: ${{ steps.project.outputs.dir }}
