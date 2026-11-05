@@ -49,7 +49,7 @@ jobs:
           name: ZglosObraczke-v28-APK-testowy
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
 
       - name: Przygotuj bezpieczny podpis wydawniczy
         shell: bash
@@ -189,4 +189,4 @@ jobs:
           name: ZglosObraczke-v28-Google-Play
           path: release/*
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 30
